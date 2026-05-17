@@ -529,6 +529,69 @@ def manage_payments():
     
     return render_template('admin/payments.html', payments=payments, active_contracts=active_contracts, today_str=date.today().isoformat())
 
+@app.route('/admin/payments/print')
+@admin_required
+def print_payments_report():
+    client = supabase_admin if supabase_admin else supabase
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    search = request.args.get('search', '').strip().lower()
+
+    try:
+        payments = client.table('payments').select('*, contracts(*, drivers(first_name, last_name), cars(license_plate))').order('payment_date', desc=False).execute().data
+    except Exception as e:
+        print(f"Error fetching payments for print: {e}")
+        payments = []
+
+    filtered_payments = []
+    total_amount = 0.0
+
+    for p in payments:
+        p_date = p['payment_date'][:10]
+        
+        if start_date and p_date < start_date:
+            continue
+        if end_date and p_date > end_date:
+            continue
+
+        driver_name = ""
+        plate = ""
+        receipt = p.get('receipt_no', '')
+        
+        if p.get('contracts'):
+            if p['contracts'].get('drivers'):
+                driver_name = f"{p['contracts']['drivers']['first_name']} {p['contracts']['drivers']['last_name']}"
+            if p['contracts'].get('cars'):
+                plate = p['contracts']['cars']['license_plate']
+
+        if search:
+            if search not in driver_name.lower() and search not in plate.lower() and search not in receipt.lower():
+                continue
+
+        filtered_payments.append(p)
+        total_amount += float(p['amount'])
+
+    try:
+        start_thai = datetime.strptime(start_date, '%Y-%m-%d').strftime('%d/%m/%Y') if start_date else "จุดเริ่มต้น"
+        end_thai = datetime.strptime(end_date, '%Y-%m-%d').strftime('%d/%m/%Y') if end_date else "ปัจจุบัน"
+    except Exception:
+        start_thai = start_date or "จุดเริ่มต้น"
+        end_thai = end_date or "ปัจจุบัน"
+
+    try:
+        config = client.table('system_settings').select('*').single().execute().data
+    except Exception:
+        config = None
+
+    return render_template('admin/payments_report_print.html',
+                           payments=filtered_payments,
+                           start_date=start_thai,
+                           end_date=end_thai,
+                           search_query=search,
+                           total_amount=total_amount,
+                           config=config,
+                           today=datetime.now())
+
 @app.route('/admin/repairs', methods=['GET', 'POST'])
 @admin_required
 def manage_repairs():

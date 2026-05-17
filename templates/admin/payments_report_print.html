@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>รายงานรายการรับชำระเงิน - TAXIMETER</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #1a365d;
+            --text: #2d3748;
+            --border: #cbd5e0;
+        }
+        body {
+            font-family: 'Sarabun', sans-serif;
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            font-size: 13px;
+            line-height: 1.5;
+            background-color: #fff;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .company-info h1 {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--primary);
+            margin: 0 0 5px 0;
+        }
+        .company-info p {
+            margin: 2px 0;
+            color: #4a5568;
+        }
+        .report-title {
+            text-align: right;
+        }
+        .report-title h2 {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0 0 5px 0;
+            color: var(--primary);
+        }
+        .report-title p {
+            margin: 2px 0;
+            font-weight: 500;
+        }
+        .summary-card {
+            background-color: #f7fafc;
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .summary-title {
+            font-weight: 600;
+            color: #718096;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .summary-value {
+            font-size: 20px;
+            font-weight: 800;
+            color: #2f855a;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+        th {
+            background-color: var(--primary);
+            color: white;
+            font-weight: 600;
+            text-align: left;
+            padding: 10px 8px;
+            font-size: 12px;
+            border: 1px solid var(--primary);
+        }
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--border);
+            border-left: 1px solid #e2e8f0;
+            border-right: 1px solid #e2e8f0;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .font-bold {
+            font-weight: 700;
+        }
+        .total-row {
+            background-color: #edf2f7;
+            font-weight: 700;
+        }
+        .footer {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .signature-box {
+            width: 200px;
+            text-align: center;
+        }
+        .signature-line {
+            border-bottom: 1px dashed var(--text);
+            margin-bottom: 8px;
+            height: 40px;
+        }
+        .print-btn-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .btn:hover {
+            background-color: #2b6cb0;
+        }
+        @media print {
+            .print-btn-container {
+                display: none;
+            }
+            body {
+                padding: 0;
+            }
+            @page {
+                size: A4;
+                margin: 1.5cm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-btn-container">
+        <button class="btn" onclick="window.print()"><i class="fa fa-print"></i> สั่งพิมพ์รายงาน (A4)</button>
+    </div>
+
+    <div class="header">
+        <div class="company-info">
+            {% if config %}
+            <h1>{{ config.lessor_name }}</h1>
+            <p><i class="fa fa-map-marker-alt"></i> {{ config.lessor_address }}</p>
+            <p><i class="fa fa-id-card"></i> เลขประจำตัวผู้เสียภาษี: {{ config.lessor_id }}</p>
+            {% else %}
+            <h1>TAXIMETER Co., Ltd.</h1>
+            <p><i class="fa fa-map-marker-alt"></i> สำนักงานใหญ่ บริหารจัดการค่าเช่าและบัญชีรถยนต์</p>
+            {% endif %}
+        </div>
+        <div class="report-title">
+            <h2>รายงานสรุปรายการรับชำระเงิน</h2>
+            <p>ช่วงวันที่: {{ start_date }} ถึง {{ end_date }}</p>
+            {% if search_query %}
+            <p>คำค้นหา: "{{ search_query }}"</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="summary-card">
+        <div>
+            <span class="summary-title">จำนวนรายการรับเงินทั้งหมด</span>
+            <div style="font-size: 18px; font-weight: 700; color: var(--primary);">{{ payments|length }} รายการ</div>
+        </div>
+        <div style="text-align: right;">
+            <span class="summary-title">รวมยอดเงินรับชำระทั้งสิ้น</span>
+            <div class="summary-value">฿{{ "{:,.2f}".format(total_amount) }}</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 15%;" class="text-center">เลขที่ใบเสร็จ</th>
+                <th style="width: 25%;">ชื่อคนขับ / ผู้รับสัญญา</th>
+                <th style="width: 15%;" class="text-center">ทะเบียนรถ</th>
+                <th style="width: 15%;" class="text-center">วันที่ชำระ</th>
+                <th style="width: 15%;">ประเภท</th>
+                <th style="width: 15%; text-align: right;">จำนวนเงิน</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for payment in payments %}
+            <tr>
+                <td class="text-center font-bold">{{ payment.receipt_no }}</td>
+                <td>
+                    {% if payment.contracts and payment.contracts.drivers %}
+                    {{ payment.contracts.drivers.first_name }} {{ payment.contracts.drivers.last_name }}
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if payment.contracts and payment.contracts.cars %}
+                    {{ payment.contracts.cars.license_plate }}
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+                <td class="text-center">{{ payment.payment_date[:10] }}</td>
+                <td>
+                    {% if payment.payment_type == 'rent' %}ค่าเช่ารถ
+                    {% elif payment.payment_type == 'deposit' %}เงินค้ำประกัน
+                    {% elif payment.payment_type == 'debt' %}ผ่อนหนี้ค้าง
+                    {% elif payment.payment_type == 'fine' %}ค่าปรับ/อื่นๆ
+                    {% else %}อื่นๆ{% endif %}
+                </td>
+                <td class="text-right font-bold" style="color: #2f855a;">฿{{ "{:,.2f}".format(payment.amount) }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="text-center" style="padding: 30px; color: #718096;">
+                    ไม่พบรายการชำระเงินตามเงื่อนไขที่เลือก
+                </td>
+            </tr>
+            {% endfor %}
+
+            <tr class="total-row">
+                <td colspan="5" class="text-right">รวมยอดเงินรับชำระสุทธิ (Grand Total)</td>
+                <td class="text-right font-bold" style="color: #2f855a;">฿{{ "{:,.2f}".format(total_amount) }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <div style="font-size: 11px; color: #718096;">
+            พิมพ์รายงาน ณ วันที่ {{ today.strftime('%d/%m/%Y %H:%M') }} น. | ระบบ TAXIMETER
+        </div>
+        <div style="display: flex; gap: 30px;">
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div>ผู้รับเงิน / เจ้าหน้าที่</div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div>ผู้ตรวจทาน / ผู้อนุมัติ</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

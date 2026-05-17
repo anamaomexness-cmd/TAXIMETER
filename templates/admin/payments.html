@@ -6,6 +6,31 @@
     <button class="btn btn-primary" onclick="showAddPaymentModal()"><i class="fa fa-plus"></i> ออกใบเสร็จใหม่</button>
 </div>
 
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.2rem; border-radius: var(--radius); border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: flex-end;">
+        <div class="form-group" style="margin: 0;">
+            <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; display: block;">ค้นหา ชื่อคนขับ / ทะเบียนรถ / เลขที่ใบเสร็จ</label>
+            <input type="text" id="paymentsSearch" class="form-control" placeholder="พิมพ์ชื่อคนขับ ทะเบียนรถ หรือเลขใบเสร็จ..." style="padding: 0.5rem 1rem; border-radius: 8px;">
+        </div>
+        <div class="form-group" style="margin: 0;">
+            <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; display: block;">ชำระจากวันที่ (Start Date)</label>
+            <input type="date" id="paymentsStartDate" class="form-control" style="padding: 0.5rem 1rem; border-radius: 8px;">
+        </div>
+        <div class="form-group" style="margin: 0;">
+            <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; display: block;">ถึงวันที่ (End Date)</label>
+            <input type="date" id="paymentsEndDate" class="form-control" style="padding: 0.5rem 1rem; border-radius: 8px;">
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button class="btn" onclick="clearFilters()" style="background: #edf2f7; color: var(--text); flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; border: none; font-weight: 600; padding: 0.6rem;">
+                <i class="fa fa-sync-alt"></i> ล้าง
+            </button>
+            <button class="btn" onclick="printFilteredReport()" style="background: #0f766e; color: white; flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; border: none; border-radius: 8px; font-weight: 600; padding: 0.6rem; box-shadow: 0 4px 15px rgba(15, 118, 110, 0.2);">
+                <i class="fa fa-print"></i> พิมพ์รายงาน
+            </button>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <div class="table-container">
         <table>
@@ -21,7 +46,7 @@
             </thead>
             <tbody>
                 {% for payment in payments %}
-                <tr>
+                <tr class="payment-row" data-driver="{{ payment.contracts.drivers.first_name }} {{ payment.contracts.drivers.last_name }}" data-plate="{{ payment.contracts.cars.license_plate }}" data-receipt="{{ payment.receipt_no }}" data-date="{{ payment.payment_date[:10] }}">
                     <td style="font-weight: 700;">{{ payment.receipt_no }}</td>
                     <td>
                         {{ payment.contracts.drivers.first_name }} {{ payment.contracts.drivers.last_name }}<br>
@@ -142,6 +167,60 @@
         } else if (type === 'debt') {
             amountInput.value = currentDebt > 0 ? currentDebt : 0;
         }
+    }
+
+    // Client-side filtering and printable report generation
+    const pSearch = document.getElementById('paymentsSearch');
+    const pStart = document.getElementById('paymentsStartDate');
+    const pEnd = document.getElementById('paymentsEndDate');
+
+    function filterPayments() {
+        const query = pSearch.value.toLowerCase();
+        const startVal = pStart.value;
+        const endVal = pEnd.value;
+        
+        const rows = document.querySelectorAll('.payment-row');
+        rows.forEach(row => {
+            const driver = row.getAttribute('data-driver').toLowerCase();
+            const plate = row.getAttribute('data-plate').toLowerCase();
+            const receipt = row.getAttribute('data-receipt').toLowerCase();
+            const rowDate = row.getAttribute('data-date'); // YYYY-MM-DD
+            
+            const matchSearch = driver.includes(query) || plate.includes(query) || receipt.includes(query);
+            let matchDate = true;
+            
+            if (startVal) {
+                matchDate = matchDate && (rowDate >= startVal);
+            }
+            if (endVal) {
+                matchDate = matchDate && (rowDate <= endVal);
+            }
+            
+            if (matchSearch && matchDate) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    pSearch.addEventListener('keyup', filterPayments);
+    pStart.addEventListener('change', filterPayments);
+    pEnd.addEventListener('change', filterPayments);
+
+    function clearFilters() {
+        pSearch.value = '';
+        pStart.value = '';
+        pEnd.value = '';
+        filterPayments();
+    }
+
+    function printFilteredReport() {
+        const query = encodeURIComponent(pSearch.value);
+        const start = pStart.value;
+        const end = pEnd.value;
+        const url = `/admin/payments/print?start_date=${start}&end_date=${end}&search=${query}`;
+        window.open(url, '_blank');
     }
 </script>
 {% endblock %}
