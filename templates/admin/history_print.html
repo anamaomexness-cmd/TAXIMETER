@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap');
+        
+        body {
+            font-family: 'Sarabun', sans-serif;
+            padding: 15mm;
+            color: #333;
+            line-height: 1.5;
+            background: #fff;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 { margin: 0; font-size: 1.8rem; }
+        .header p { margin: 5px 0 0; color: #666; }
+
+        .meta {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 2rem;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-size: 0.85rem;
+        }
+
+        th { background: #f2f2f2; }
+
+        .footer {
+            margin-top: 3rem;
+            text-align: right;
+            font-size: 0.8rem;
+            color: #999;
+        }
+
+        .no-print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #4a5568;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        @media print {
+            .no-print-btn { display: none; }
+            body { padding: 0; }
+        }
+    </style>
+</head>
+<body>
+    <button class="no-print-btn" onclick="window.print()">พิมพ์รายงาน</button>
+
+    <div class="header">
+        <h1>{{ title }}</h1>
+        <p>{{ config.get('lessor_name', 'TAXIMETER MANAGEMENT') }}</p>
+    </div>
+
+    <div class="meta">
+        <div>วันที่ออกรายงาน: {{ today.strftime('%d/%m/%Y %H:%M') }}</div>
+        <div>จำนวนทั้งหมด: {{ contracts|length }} รายการ</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ลำดับ</th>
+                <th>วันที่เริ่ม</th>
+                <th>วันที่สิ้นสุด</th>
+                <th>ทะเบียนรถ</th>
+                <th>ชื่อคนขับ</th>
+                <th>ราคา/วัน</th>
+                <th>สถานะ</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in contracts %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ c.start_date }}</td>
+                <td>{{ c.end_date or '-' }}</td>
+                <td>{{ c.cars.license_plate }}</td>
+                <td>{{ c.drivers.first_name }} {{ c.drivers.last_name }}</td>
+                <td>{{ "{:,.2f}".format(c.daily_rate) }}</td>
+                <td>{{ 'กำลังเช่า' if c.status == 'active' else 'สิ้นสุดแล้ว' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        ผู้ออกรายงาน: {{ session.get('full_name') }}<br>
+        เอกสารนี้สร้างโดยระบบจัดการรถแท็กซี่อัตโนมัติ
+    </div>
+</body>
+</html>

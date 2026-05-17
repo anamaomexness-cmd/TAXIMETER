@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+    <h1 style="font-weight: 800;">สวัสดีครับ คุณ {{ driver.first_name }} {{ driver.last_name }}</h1>
+    <p style="color: var(--text-muted);">ยินดีต้อนรับสู่ระบบจัดการผู้เช่าอัจฉริยะ</p>
+</div>
+
+<div class="stat-grid">
+    <div class="stat-card" style="background: linear-gradient(135deg, #d63031, #e17055, #fdcb6e); color: white;">
+        <div>
+            <p style="color: rgba(255,255,255,0.8); font-weight: 600;">ยอดค้างชำระปัจจุบัน</p>
+            <h2 style="font-size: 2.5rem; margin-top: 0.5rem;">฿{{ "{:,.2f}".format(current_debt) }}</h2>
+            {% if contract %}
+            <small style="opacity: 0.9;">คำนวณตามโปรโมชั่น: 
+                {% if contract.promotion_type == '2_free_1' %}2 ฟรี 1
+                {% elif contract.promotion_type == '3_free_1' %}3 ฟรี 1
+                {% elif contract.promotion_type == '5_free_1' %}5 ฟรี 1
+                {% elif contract.promotion_type == '7_free_1' %}7 ฟรี 1
+                {% else %}ปกติ{% endif %}
+            </small>
+            {% endif %}
+        </div>
+        <div class="icon" style="color: white; opacity: 0.2;"><i class="fa fa-wallet"></i></div>
+    </div>
+    
+    <div class="stat-card" style="border-bottom: 5px solid var(--primary);">
+        <div>
+            <p>เงินค้ำประกันสะสม</p>
+            <h3 style="color: var(--primary); font-size: 2rem;">฿{{ "{:,.2f}".format(balance) }}</h3>
+        </div>
+        <div class="icon"><i class="fa fa-piggy-bank"></i></div>
+    </div>
+</div>
+
+{% if contract %}
+<div class="card" style="margin-top: 2rem; border-left: 5px solid var(--primary);">
+    <h3 style="margin-bottom: 1rem;"><i class="fa fa-car"></i> ข้อมูลการเช่าปัจจุบัน</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">ทะเบียนรถ</p>
+            <p style="font-weight: 700; font-size: 1.2rem;">{{ contract.cars.license_plate }}</p>
+        </div>
+        <div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">วันที่เริ่มเช่า</p>
+            <p style="font-weight: 700;">{{ contract.start_date }}</p>
+        </div>
+        <div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">อัตราค่าเช่า</p>
+            <p style="font-weight: 700;">฿{{ "{:,.2f}".format(contract.daily_rate) }}/วัน</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card" style="margin-top: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2 style="font-weight: 700;">ประวัติการชำระเงิน / ค้นหาใบเสร็จ</h2>
+    </div>
+    
+    <div style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem;">
+        <input type="month" class="form-control" style="max-width: 250px;">
+        <button class="btn btn-primary"><i class="fa fa-search"></i> ค้นหา</button>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>เลขที่ใบเสร็จ</th>
+                    <th>วันที่</th>
+                    <th>รายการ</th>
+                    <th>จำนวนเงิน</th>
+                    <th>ดู</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for receipt in receipts %}
+                <tr>
+                    <td style="font-weight: 700;">{{ receipt.receipt_no }}</td>
+                    <td>{{ receipt.payment_date[:10] }}</td>
+                    <td>
+                        {% if receipt.payment_type == 'rent' %}ค่าเช่ารถ
+                        {% elif receipt.payment_type == 'deposit' %}เงินค้ำประกัน
+                        {% else %}อื่นๆ{% endif %}
+                    </td>
+                    <td style="color: var(--success); font-weight: 700;">฿{{ "{:,.2f}".format(receipt.amount) }}</td>
+                    <td>
+                        <button class="btn" style="padding: 0.5rem; background: #ebf8ff; color: var(--primary);"><i class="fa fa-print"></i></button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 3rem; color: var(--text-muted);">ยังไม่มีประวัติการชำระเงิน</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

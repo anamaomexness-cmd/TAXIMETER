@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem;">
+    <div>
+        <h1 style="font-weight: 800;">รายงานสรุปการเงิน (เฉพาะรถแท็กซี่)</h1>
+        <p style="color: var(--text-muted);">สรุปรายรับ-รายจ่าย สำหรับรถประเภทแท็กซี่</p>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="{{ url_for('print_report', type='daily', date=selected_date) }}" target="_blank" class="btn btn-outline" style="background: white;">
+            <i class="fa fa-print"></i> พิมพ์รายงานรายวัน
+        </a>
+        <a href="{{ url_for('print_report', type='monthly', month=selected_month) }}" target="_blank" class="btn btn-outline" style="background: white;">
+            <i class="fa fa-print"></i> พิมพ์รายงานรายเดือน
+        </a>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom: 2rem; background: #f8fafc;">
+    <form method="GET" action="{{ url_for('manage_reports') }}" style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end;">
+        <div style="flex: 1; min-width: 200px;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">ประเภทรายงาน</label>
+            <select name="type" class="form-control" onchange="this.form.submit()">
+                <option value="all" {% if report_type == 'all' %}selected{% endif %}>ทั้งหมด</option>
+                <option value="daily" {% if report_type == 'daily' %}selected{% endif %}>รายวัน</option>
+                <option value="monthly" {% if report_type == 'monthly' %}selected{% endif %}>รายเดือน</option>
+            </select>
+        </div>
+        
+        {% if report_type == 'daily' %}
+        <div style="flex: 1; min-width: 200px;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">เลือกวันที่</label>
+            <input type="date" name="date" value="{{ selected_date }}" class="form-control" onchange="this.form.submit()">
+        </div>
+        {% elif report_type == 'monthly' %}
+        <div style="flex: 1; min-width: 200px;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">เลือกเดือน</label>
+            <input type="month" name="month" value="{{ selected_month }}" class="form-control" onchange="this.form.submit()">
+        </div>
+        {% endif %}
+
+        <div style="flex: 0;">
+            <a href="{{ url_for('manage_reports') }}" class="btn btn-secondary">ล้างตัวกรอง</a>
+        </div>
+    </form>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
+    <div class="card" style="border-left: 5px solid var(--success);">
+        <small style="color: var(--text-muted); text-transform: uppercase; font-weight: 700;">รายรับรวมทั้งหมด</small>
+        <h2 style="font-size: 2rem; margin-top: 0.5rem; color: var(--success);">฿{{ "{:,.2f}".format(summary.total_income) }}</h2>
+    </div>
+    <div class="card" style="border-left: 5px solid var(--danger);">
+        <small style="color: var(--text-muted); text-transform: uppercase; font-weight: 700;">รายจ่าย (ค่าซ่อมบำรุง)</small>
+        <h2 style="font-size: 2rem; margin-top: 0.5rem; color: var(--danger);">฿{{ "{:,.2f}".format(summary.repairs) }}</h2>
+    </div>
+    <div class="card" style="border-left: 5px solid var(--primary);">
+        <small style="color: var(--text-muted); text-transform: uppercase; font-weight: 700;">กำไรสุทธิ</small>
+        <h2 style="font-size: 2rem; margin-top: 0.5rem; color: var(--primary);">฿{{ "{:,.2f}".format(summary.net_profit) }}</h2>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="margin-bottom: 1.5rem; font-weight: 700;">รายละเอียดรายรับแยกตามประเภท</h3>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ประเภทรายรับ</th>
+                    <th style="text-align: right;">จำนวนเงิน</th>
+                    <th>สัดส่วน</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><i class="fa fa-car" style="color: var(--primary); margin-right: 0.5rem;"></i> ค่าเช่ารถปกติ (Rent)</td>
+                    <td style="text-align: right; font-weight: 700;">฿{{ "{:,.2f}".format(summary.rent) }}</td>
+                    <td>
+                        <div style="width: 100%; background: #edf2f7; height: 8px; border-radius: 4px;">
+                            <div style="width: {{ (summary.rent / summary.total_income * 100) if summary.total_income > 0 else 0 }}%; background: var(--primary); height: 100%; border-radius: 4px;"></div>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td><i class="fa fa-history" style="color: var(--danger); margin-right: 0.5rem;"></i> ผ่อนชำระหนี้ค้าง (Debt)</td>
+                    <td style="text-align: right; font-weight: 700;">฿{{ "{:,.2f}".format(summary.debt) }}</td>
+                    <td>
+                        <div style="width: 100%; background: #edf2f7; height: 8px; border-radius: 4px;">
+                            <div style="width: {{ (summary.debt / summary.total_income * 100) if summary.total_income > 0 else 0 }}%; background: var(--danger); height: 100%; border-radius: 4px;"></div>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td><i class="fa fa-shield-alt" style="color: var(--success); margin-right: 0.5rem;"></i> เงินค้ำประกัน (Deposit)</td>
+                    <td style="text-align: right; font-weight: 700;">฿{{ "{:,.2f}".format(summary.deposit) }}</td>
+                    <td>
+                        <div style="width: 100%; background: #edf2f7; height: 8px; border-radius: 4px;">
+                            <div style="width: {{ (summary.deposit / summary.total_income * 100) if summary.total_income > 0 else 0 }}%; background: var(--success); height: 100%; border-radius: 4px;"></div>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td><i class="fa fa-exclamation-circle" style="color: #ecc94b; margin-right: 0.5rem;"></i> ค่าปรับ/อื่นๆ (Fines)</td>
+                    <td style="text-align: right; font-weight: 700;">฿{{ "{:,.2f}".format(summary.fine) }}</td>
+                    <td>
+                        <div style="width: 100%; background: #edf2f7; height: 8px; border-radius: 4px;">
+                            <div style="width: {{ (summary.fine / summary.total_income * 100) if summary.total_income > 0 else 0 }}%; background: #ecc94b; height: 100%; border-radius: 4px;"></div>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr style="background: #f8f9fa; font-weight: 800;">
+                    <td>รวมรายรับทั้งหมด</td>
+                    <td style="text-align: right;">฿{{ "{:,.2f}".format(summary.total_income) }}</td>
+                    <td>100%</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+{% if payments %}
+<div class="card" style="margin-top: 2rem;">
+    <h3 style="margin-bottom: 1.5rem; font-weight: 700;">รายการรับเงิน (Payments)</h3>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>วันที่/เวลา</th>
+                    <th>เลขที่ใบเสร็จ</th>
+                    <th>รถ/คนขับ</th>
+                    <th>ประเภท</th>
+                    <th style="text-align: right;">จำนวนเงิน</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr>
+                    <td>{{ p.payment_date[:16].replace('T', ' ') }}</td>
+                    <td><code>{{ p.receipt_no }}</code></td>
+                    <td>
+                        <strong>{{ p.contracts.cars.license_plate }}</strong><br>
+                        <small>{{ p.contracts.drivers.first_name }} {{ p.contracts.drivers.last_name }}</small>
+                    </td>
+                    <td>
+                        {% if p.payment_type == 'rent' %}<span class="badge badge-primary">ค่าเช่า</span>
+                        {% elif p.payment_type == 'debt' %}<span class="badge badge-danger">ผ่อนหนี้</span>
+                        {% elif p.payment_type == 'deposit' %}<span class="badge badge-success">เงินค้ำ</span>
+                        {% else %}<span class="badge badge-secondary">อื่นๆ</span>{% endif %}
+                    </td>
+                    <td style="text-align: right; font-weight: 700;">฿{{ "{:,.2f}".format(p.amount) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if repairs %}
+<div class="card" style="margin-top: 2rem;">
+    <h3 style="margin-bottom: 1.5rem; font-weight: 700;">รายการจ่าย (ค่าซ่อมบำรุง)</h3>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>วันที่</th>
+                    <th>ทะเบียนรถ</th>
+                    <th>รายการ</th>
+                    <th style="text-align: right;">ค่าใช้จ่าย</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in repairs %}
+                <tr>
+                    <td>{{ r.repair_date }}</td>
+                    <td><strong>{{ r.cars.license_plate }}</strong></td>
+                    <td>{{ r.description }}</td>
+                    <td style="text-align: right; font-weight: 700; color: var(--danger);">฿{{ "{:,.2f}".format(r.cost) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div style="margin-top: 2rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+    * ข้อมูลรายรับรวมเงินค้ำประกัน (Deposit) ซึ่งอาจต้องคืนในอนาคตตามเงื่อนไขสัญญา
+</div>
+{% endblock %}

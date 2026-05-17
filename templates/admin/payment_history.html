@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem;">
+    <div>
+        <h1 style="font-weight: 800;">ประวัติการชำระเงิน</h1>
+        <p style="color: var(--text-muted);">ค้นหาและดูประวัติการรับชำระเงินทั้งหมด</p>
+    </div>
+    <div>
+        <a href="{{ url_for('print_payment_history', car=search_car, driver=search_driver) }}" target="_blank" class="btn btn-outline" style="background: white;">
+            <i class="fa fa-print"></i> พิมพ์รายงานนี้
+        </a>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 2rem; background: #f8fafc;">
+    <form method="GET" action="{{ url_for('manage_payment_history') }}" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+        <div style="flex: 1; min-width: 200px;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">ทะเบียนรถ</label>
+            <input type="text" name="car" value="{{ search_car }}" placeholder="เช่น 1กก 1234" class="form-control">
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">ชื่อคนขับ</label>
+            <input type="text" name="driver" value="{{ search_driver }}" placeholder="ชื่อหรือนามสกุล" class="form-control">
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="submit" class="btn btn-primary"><i class="fa fa-search"></i> ค้นหา</button>
+            <a href="{{ url_for('manage_payment_history') }}" class="btn btn-secondary">ล้าง</a>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>วันที่/เวลา</th>
+                    <th>เลขที่ใบเสร็จ</th>
+                    <th>ทะเบียนรถ</th>
+                    <th>คนขับ</th>
+                    <th>ประเภท</th>
+                    <th style="text-align: right;">จำนวนเงิน</th>
+                    <th>การดำเนินการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr class="payment-row" data-car="{{ p.contracts.cars.license_plate }}" data-driver="{{ p.contracts.drivers.first_name }} {{ p.contracts.drivers.last_name }}">
+                    <td>{{ p.payment_date[:16].replace('T', ' ') }}</td>
+                    <td><code>{{ p.receipt_no }}</code></td>
+                    <td><strong>{{ p.contracts.cars.license_plate }}</strong></td>
+                    <td>{{ p.contracts.drivers.first_name }} {{ p.contracts.drivers.last_name }}</td>
+                    <td>
+                        {% if p.payment_type == 'rent' %}<span class="badge badge-primary">ค่าเช่า</span>
+                        {% elif p.payment_type == 'debt' %}<span class="badge badge-danger">ผ่อนหนี้</span>
+                        {% elif p.payment_type == 'deposit' %}<span class="badge badge-success">เงินค้ำ</span>
+                        {% else %}<span class="badge badge-secondary">อื่นๆ</span>{% endif %}
+                    </td>
+                    <td style="text-align: right; font-weight: 700;">฿{{ "{:,.2f}".format(p.amount) }}</td>
+                    <td>
+                        <a href="{{ url_for('print_receipt', payment_id=p.id) }}" target="_blank" class="btn btn-sm btn-outline">
+                            <i class="fa fa-print"></i> ใบเสร็จ
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr id="noDataRow" style="display: none;">
+                    <td colspan="7" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                        ไม่พบข้อมูลประวัติการชำระเงินตามเงื่อนไขที่ระบุ
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const carInput = document.querySelector('input[name="car"]');
+    const driverInput = document.querySelector('input[name="driver"]');
+    const printBtn = document.querySelector('a[href*="payment_history/print"]');
+    const rows = document.querySelectorAll('.payment-row');
+    const noDataRow = document.getElementById('noDataRow');
+
+    function filterTable() {
+        const carVal = carInput.value.toLowerCase();
+        const driverVal = driverInput.value.toLowerCase();
+        let visibleCount = 0;
+
+        rows.forEach(row => {
+            const carText = row.getAttribute('data-car').toLowerCase();
+            const driverText = row.getAttribute('data-driver').toLowerCase();
+            
+            if (carText.includes(carVal) && driverText.includes(driverVal)) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        if (noDataRow) {
+            noDataRow.style.display = visibleCount === 0 ? '' : 'none';
+        }
+
+        // Update Print URL
+        const baseUrl = "{{ url_for('print_payment_history') }}";
+        printBtn.href = `${baseUrl}?car=${encodeURIComponent(carVal)}&driver=${encodeURIComponent(driverVal)}`;
+    }
+
+    carInput.addEventListener('input', filterTable);
+    driverInput.addEventListener('input', filterTable);
+    
+    // Initial filter
+    filterTable();
+});
+</script>
+{% endblock %}

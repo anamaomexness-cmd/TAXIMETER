@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; gap: 1rem; flex-wrap: wrap;">
+    <h1 style="font-weight: 800;">ข้อมูลคนขับ</h1>
+    <div style="display: flex; gap: 1rem; flex: 1; max-width: 600px;">
+        <input type="text" id="driverSearchInput" placeholder="ค้นหาด้วยชื่อ, นามสกุล, เบอร์โทร, เลขบัตร..." class="form-control" style="flex: 1;">
+        <button class="btn btn-primary" onclick="showAddDriverModal()" style="white-space: nowrap;"><i class="fa fa-user-plus"></i> เพิ่มคนขับใหม่</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>รูปถ่าย</th>
+                    <th>ชื่อ-นามสกุล</th>
+                    <th>เลขบัตร/ใบขับขี่</th>
+                    <th>เบอร์โทรศัพท์</th>
+                    <th>เงินค้ำประกัน (เป้าหมาย)</th>
+                    <th>จัดการ</th>
+                </tr>
+            </thead>
+            <tbody id="driverTableBody">
+                {% for driver in drivers %}
+                <tr class="driver-row" data-name="{{ driver.first_name }} {{ driver.last_name }}" data-phone="{{ driver.phone }}" data-idcard="{{ driver.id_card_number or '' }}">
+                    <td>
+                        {% if driver.photo_url %}
+                            <img src="{{ driver.photo_url }}" onclick="openGallery(['{{ driver.photo_url }}', '{{ driver.license_photo_url }}'], 0)" 
+                                 style="width: 50px; height: 50px; object-fit: cover; border-radius: 50%; cursor: pointer; border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        {% else %}
+                            <div style="width: 50px; height: 50px; background: #edf2f7; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #a0aec0;">
+                                <i class="fa fa-user"></i>
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td style="font-weight: 700;">{{ driver.first_name }} {{ driver.last_name }}</td>
+                    <td>
+                        <div style="font-size: 0.85rem;">บัตร: {{ driver.id_card_number or '-' }}</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">ใบขับขี่: {{ driver.license_number }}</div>
+                    </td>
+                    <td>{{ driver.phone }}</td>
+                    <td>
+                        {% set percent = (driver.deposit_balance / driver.target_deposit * 100) if driver.target_deposit > 0 else 0 %}
+                        <div style="margin-bottom: 5px; font-weight: 600;">
+                            <span style="color: var(--success);">฿{{ "{:,.0f}".format(driver.deposit_balance) }}</span> 
+                            / <span style="color: var(--text-muted);">฿{{ "{:,.0f}".format(driver.target_deposit or 0) }}</span>
+                        </div>
+                        <div style="width: 100%; height: 8px; background: #edf2f7; border-radius: 4px; overflow: hidden;">
+                            <div style="width: {{ [percent, 100]|min }}%; height: 100%; background: {% if percent >= 100 %}var(--success){% else %}var(--primary){% endif %};"></div>
+                        </div>
+                    </td>
+                    <td>
+                        <button class="btn" style="padding: 0.5rem; background: #edf2f7; color: var(--text);" onclick='showEditDriverModal({{ driver|tojson|safe }})'><i class="fa fa-edit"></i></button>
+                        <button class="btn" style="padding: 0.5rem; background: #fff5f5; color: var(--danger);" onclick="confirmDeleteDriver('{{ driver.id }}', '{{ driver.first_name }}')"><i class="fa fa-trash"></i></button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-muted);">ไม่พบข้อมูลคนขับในระบบ</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Driver Modal -->
+<div id="addDriverModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 700px; margin: 0; max-height: 90vh; overflow-y: auto;">
+        <h2 style="margin-bottom: 1.5rem;">เพิ่มข้อมูลคนขับใหม่</h2>
+        <form action="{{ url_for('manage_drivers') }}" method="POST" enctype="multipart/form-data">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>ชื่อ</label>
+                    <input type="text" name="first_name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>นามสกุล</label>
+                    <input type="text" name="last_name" class="form-control" required>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>เบอร์โทรศัพท์</label>
+                    <input type="tel" name="phone" class="form-control" placeholder="08x-xxx-xxxx" required>
+                </div>
+                <div class="form-group">
+                    <label>เลขบัตรประชาชน</label>
+                    <input type="text" name="id_card_number" class="form-control" placeholder="x-xxxx-xxxxx-xx-x">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>เลขที่ใบขับขี่</label>
+                <input type="text" name="license_number" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>ที่อยู่ปัจจุบัน</label>
+                <textarea name="address" class="form-control" rows="2"></textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>เงินค้ำแรกเข้า (บาท)</label>
+                    <input type="number" name="deposit_balance" class="form-control" value="0">
+                </div>
+                <div class="form-group">
+                    <label>เป้าหมายเงินค้ำทั้งหมด (บาท)</label>
+                    <input type="number" name="target_deposit" class="form-control" value="3000">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>รูปถ่ายคนขับ</label>
+                    <input type="file" name="photo_file" class="form-control" accept="image/*">
+                </div>
+                <div class="form-group">
+                    <label>รูปใบขับขี่/บัตรประชาชน</label>
+                    <input type="file" name="license_photo_file" class="form-control" accept="image/*">
+                </div>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn" onclick="hideAddDriverModal()" style="background: #e2e8f0;">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary">บันทึกข้อมูล</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Driver Modal -->
+<div id="editDriverModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 700px; margin: 0; max-height: 90vh; overflow-y: auto;">
+        <h2 style="margin-bottom: 1.5rem;">แก้ไขข้อมูลคนขับ</h2>
+        <form id="editDriverForm" method="POST" enctype="multipart/form-data">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>ชื่อ</label>
+                    <input type="text" name="first_name" id="edit_first_name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>นามสกุล</label>
+                    <input type="text" name="last_name" id="edit_last_name" class="form-control" required>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>เบอร์โทรศัพท์</label>
+                    <input type="tel" name="phone" id="edit_phone" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>เลขบัตรประชาชน</label>
+                    <input type="text" name="id_card_number" id="edit_id_card_number" class="form-control">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>เลขที่ใบขับขี่</label>
+                <input type="text" name="license_number" id="edit_license_number" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>ที่อยู่ปัจจุบัน</label>
+                <textarea name="address" id="edit_address" class="form-control" rows="2"></textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>เงินค้ำปัจจุบัน (บาท)</label>
+                    <input type="number" name="deposit_balance" id="edit_deposit_balance" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>เป้าหมายเงินค้ำทั้งหมด (บาท)</label>
+                    <input type="number" name="target_deposit" id="edit_target_deposit" class="form-control">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>เปลี่ยนรูปถ่ายคนขับ</label>
+                    <input type="file" name="photo_file" class="form-control" accept="image/*">
+                </div>
+                <div class="form-group">
+                    <label>เปลี่ยนรูปใบขับขี่</label>
+                    <input type="file" name="license_photo_file" class="form-control" accept="image/*">
+                </div>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn" onclick="hideEditDriverModal()" style="background: #e2e8f0;">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary">บันทึกการแก้ไข</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Form (Hidden) -->
+<form id="deleteDriverForm" method="POST" style="display: none;"></form>
+
+<!-- Lightbox Modal -->
+<div id="lightbox" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 3000; justify-content: center; align-items: center;">
+    <div onclick="closeLightbox()" style="position: absolute; top: 20px; right: 30px; color: white; font-size: 3rem; cursor: pointer; z-index: 3001;">&times;</div>
+    <div id="prevBtn" onclick="prevImage()" style="position: absolute; left: 20px; color: white; font-size: 3rem; cursor: pointer; user-select: none; padding: 20px;">&#10094;</div>
+    <img id="lightboxImg" src="" style="max-width: 85%; max-height: 85%; border-radius: 5px; box-shadow: 0 0 50px rgba(0,0,0,0.5); border: 3px solid white;">
+    <div id="nextBtn" onclick="nextImage()" style="position: absolute; right: 20px; color: white; font-size: 3rem; cursor: pointer; user-select: none; padding: 20px;">&#10095;</div>
+    <div id="imageCounter" style="position: absolute; bottom: 20px; color: white; font-size: 1rem; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px;"></div>
+</div>
+
+<script>
+    function showAddDriverModal() { document.getElementById('addDriverModal').style.display = 'flex'; }
+    function hideAddDriverModal() { document.getElementById('addDriverModal').style.display = 'none'; }
+
+    function showEditDriverModal(driver) {
+        document.getElementById('editDriverForm').action = `/admin/drivers/edit/${driver.id}`;
+        document.getElementById('edit_first_name').value = driver.first_name;
+        document.getElementById('edit_last_name').value = driver.last_name;
+        document.getElementById('edit_phone').value = driver.phone;
+        document.getElementById('edit_id_card_number').value = driver.id_card_number || '';
+        document.getElementById('edit_license_number').value = driver.license_number;
+        document.getElementById('edit_address').value = driver.address || '';
+        document.getElementById('edit_deposit_balance').value = driver.deposit_balance;
+        document.getElementById('edit_target_deposit').value = driver.target_deposit || 3000;
+        document.getElementById('editDriverModal').style.display = 'flex';
+    }
+
+    function hideEditDriverModal() {
+        document.getElementById('editDriverModal').style.display = 'none';
+    }
+
+    function confirmDeleteDriver(id, name) {
+        if (confirm(`คุณต้องการลบข้อมูลคุณ ${name} ใช่หรือไม่?`)) {
+            const form = document.getElementById('deleteDriverForm');
+            form.action = `/admin/drivers/delete/${id}`;
+            form.submit();
+        }
+    }
+
+    // Lightbox Logic
+    let currentGallery = [];
+    let currentIndex = 0;
+    function openGallery(images, index) {
+        currentGallery = images.filter(img => img && img !== 'None' && img !== 'null');
+        currentIndex = index;
+        if (currentGallery.length > 0) {
+            updateLightbox();
+            document.getElementById('lightbox').style.display = 'flex';
+        }
+    }
+    function updateLightbox() {
+        const img = document.getElementById('lightboxImg');
+        const counter = document.getElementById('imageCounter');
+        img.src = currentGallery[currentIndex];
+        counter.innerText = `รูปที่ ${currentIndex + 1} / ${currentGallery.length}`;
+        document.getElementById('prevBtn').style.visibility = currentGallery.length > 1 ? 'visible' : 'hidden';
+        document.getElementById('nextBtn').style.visibility = currentGallery.length > 1 ? 'visible' : 'hidden';
+    }
+    function nextImage() { currentIndex = (currentIndex + 1) % currentGallery.length; updateLightbox(); }
+    function prevImage() { currentIndex = (currentIndex - 1 + currentGallery.length) % currentGallery.length; updateLightbox(); }
+    function closeLightbox() { document.getElementById('lightbox').style.display = 'none'; }
+
+    // Real-time Search Logic
+    document.getElementById('driverSearchInput').addEventListener('input', function(e) {
+        const query = e.target.value.toLowerCase();
+        const rows = document.querySelectorAll('.driver-row');
+        
+        rows.forEach(row => {
+            const name = row.getAttribute('data-name').toLowerCase();
+            const phone = row.getAttribute('data-phone').toLowerCase();
+            const idcard = row.getAttribute('data-idcard').toLowerCase();
+            
+            if (name.includes(query) || phone.includes(query) || idcard.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+</script>
+{% endblock %}

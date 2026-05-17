@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap');
+        
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background: #f0f0f0;
+            padding: 2rem;
+            color: #333;
+            line-height: 1.5;
+        }
+
+        .report-container {
+            background: white;
+            width: 210mm; /* A4 Width */
+            min-height: 297mm; /* A4 Height */
+            margin: 0 auto;
+            padding: 20mm;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2rem;
+            color: #1a202c;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #4a5568;
+            font-size: 1.1rem;
+        }
+
+        .meta-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-box {
+            border: 1px solid #e2e8f0;
+            padding: 1rem;
+            text-align: center;
+            border-radius: 4px;
+        }
+
+        .summary-box strong {
+            display: block;
+            font-size: 0.8rem;
+            color: #718096;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-box span {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2d3748;
+        }
+
+        h2 {
+            font-size: 1.2rem;
+            border-left: 4px solid #3182ce;
+            padding-left: 0.5rem;
+            margin: 2rem 0 1rem;
+            color: #2d3748;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+        }
+
+        th {
+            background: #f7fafc;
+            text-align: left;
+            padding: 0.6rem;
+            border: 1px solid #edf2f7;
+            color: #4a5568;
+        }
+
+        td {
+            padding: 0.6rem;
+            border: 1px solid #edf2f7;
+        }
+
+        .text-right { text-align: right; }
+        .font-bold { font-weight: 700; }
+
+        .total-row {
+            background: #f7fafc;
+            font-weight: 700;
+        }
+
+        .footer {
+            margin-top: 3rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #718096;
+        }
+
+        .no-print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 0.8rem 1.5rem;
+            background: #3182ce;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        .no-print-btn:hover { background: #2c5282; }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .report-container { box-shadow: none; width: 100%; margin: 0; padding: 15mm; }
+            .no-print-btn { display: none; }
+            @page { margin: 10mm; }
+        }
+    </style>
+</head>
+<body>
+    <button class="no-print-btn" onclick="window.print()">
+        <svg style="width:18px;height:18px;vertical-align:middle;margin-right:5px" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+        พิมพ์รายงาน
+    </button>
+
+    <div class="report-container">
+        <div class="header">
+            <h1>{{ title }}</h1>
+            <p>{{ config.get('lessor_name', 'TAXIMETER MANAGEMENT') }}</p>
+        </div>
+
+        <div class="meta-info">
+            <div>ผู้ออกรายงาน: {{ session.get('full_name', 'Admin') }}</div>
+            <div>วันที่ออกรายงาน: {{ today.strftime('%d/%m/%Y %H:%M') }}</div>
+        </div>
+
+        <div class="summary-grid">
+            <div class="summary-box" style="border-top: 4px solid #48bb78;">
+                <strong>รายรับรวม</strong>
+                <span style="color: #2f855a;">฿{{ "{:,.2f}".format(summary.total_income) }}</span>
+            </div>
+            <div class="summary-box" style="border-top: 4px solid #f56565;">
+                <strong>รายจ่ายรวม</strong>
+                <span style="color: #c53030;">฿{{ "{:,.2f}".format(summary.repairs) }}</span>
+            </div>
+            <div class="summary-box" style="border-top: 4px solid #3182ce;">
+                <strong>กำไรสุทธิ</strong>
+                <span style="color: #2b6cb0;">฿{{ "{:,.2f}".format(summary.net_profit) }}</span>
+            </div>
+        </div>
+
+        <h2>สรุปแยกประเภทรายรับ</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ประเภทรายรับ</th>
+                    <th class="text-right">จำนวนเงิน (บาท)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>ค่าเช่ารถปกติ (Rent)</td>
+                    <td class="text-right">฿{{ "{:,.2f}".format(summary.rent) }}</td>
+                </tr>
+                <tr>
+                    <td>ผ่อนชำระหนี้ค้าง (Debt)</td>
+                    <td class="text-right">฿{{ "{:,.2f}".format(summary.debt) }}</td>
+                </tr>
+                <tr>
+                    <td>เงินค้ำประกัน (Deposit)</td>
+                    <td class="text-right">฿{{ "{:,.2f}".format(summary.deposit) }}</td>
+                </tr>
+                <tr>
+                    <td>ค่าปรับ/อื่นๆ (Fines)</td>
+                    <td class="text-right">฿{{ "{:,.2f}".format(summary.fine) }}</td>
+                </tr>
+                <tr class="total-row">
+                    <td>รวมรายรับทั้งหมด</td>
+                    <td class="text-right">฿{{ "{:,.2f}".format(summary.total_income) }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        {% if payments %}
+        <h2>รายละเอียดรายรับ</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>วันที่/เวลา</th>
+                    <th>เลขที่ใบเสร็จ</th>
+                    <th>ทะเบียนรถ</th>
+                    <th>ชื่อคนขับ</th>
+                    <th>ประเภท</th>
+                    <th class="text-right">จำนวนเงิน</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr>
+                    <td>{{ p.payment_date[:16].replace('T', ' ') }}</td>
+                    <td>{{ p.receipt_no }}</td>
+                    <td>{{ p.contracts.cars.license_plate }}</td>
+                    <td>{{ p.contracts.drivers.first_name }} {{ p.contracts.drivers.last_name }}</td>
+                    <td>
+                        {% if p.payment_type == 'rent' %}ค่าเช่า
+                        {% elif p.payment_type == 'debt' %}ผ่อนหนี้
+                        {% elif p.payment_type == 'deposit' %}เงินค้ำ
+                        {% else %}อื่นๆ{% endif %}
+                    </td>
+                    <td class="text-right">฿{{ "{:,.2f}".format(p.amount) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {% if repairs %}
+        <div style="page-break-before: auto;">
+            <h2>รายละเอียดรายจ่าย (ค่าซ่อมบำรุง)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>วันที่</th>
+                        <th>ทะเบียนรถ</th>
+                        <th>รายการ</th>
+                        <th class="text-right">ค่าใช้จ่าย</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in repairs %}
+                    <tr>
+                        <td>{{ r.repair_date }}</td>
+                        <td>{{ r.cars.license_plate }}</td>
+                        <td>{{ r.description }}</td>
+                        <td class="text-right">฿{{ "{:,.2f}".format(r.cost) }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="total-row">
+                        <td colspan="3" class="text-right">รวมรายจ่ายทั้งหมด</td>
+                        <td class="text-right">฿{{ "{:,.2f}".format(summary.repairs) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <div class="footer">
+            <div>พิมพ์โดย: {{ session.get('full_name') }}</div>
+            <div>เอกสารนี้สร้างขึ้นโดยระบบ TAXIMETER MANAGEMENT SYSTEM</div>
+        </div>
+    </div>
+</body>
+</html>

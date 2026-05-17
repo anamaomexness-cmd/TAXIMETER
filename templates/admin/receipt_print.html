@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ใบเสร็จรับเงิน - {{ payment.receipt_no }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap');
+        
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background: #f0f0f0;
+            padding: 2rem;
+            color: #333;
+        }
+
+        .receipt-container {
+            background: white;
+            width: 148mm; /* A5 Width */
+            min-height: 210mm; /* A5 Height */
+            margin: 0 auto;
+            padding: 2rem;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            text-transform: uppercase;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .info-item {
+            font-size: 0.95rem;
+        }
+
+        .info-item strong {
+            display: block;
+            color: #666;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 2rem;
+        }
+
+        th {
+            background: #f8f9fa;
+            text-align: left;
+            padding: 0.8rem;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        td {
+            padding: 0.8rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .total-row {
+            font-size: 1.2rem;
+            font-weight: 700;
+            background: #f8f9fa;
+        }
+
+        .footer {
+            margin-top: 4rem;
+            display: flex;
+            justify-content: space-between;
+            text-align: center;
+        }
+
+        .signature {
+            width: 200px;
+            border-top: 1px solid #333;
+            padding-top: 0.5rem;
+        }
+
+        .no-print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 2rem;
+            background: #4a5568;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .receipt-container { box-shadow: none; width: 100%; margin: 0; }
+            .no-print-btn { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <button class="no-print-btn" onclick="window.print()">สั่งพิมพ์ใบเสร็จ</button>
+
+    <div class="receipt-container">
+        <div class="header">
+            <h1>ใบเสร็จรับเงิน (Receipt)</h1>
+            <p>TAXIMETER MANAGEMENT SYSTEM</p>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <strong>เลขที่ใบเสร็จ / Receipt No.</strong>
+                {{ payment.receipt_no }}
+            </div>
+            <div class="info-item" style="text-align: right;">
+                <strong>วันที่ / Date</strong>
+                {{ payment.payment_date[:16].replace('T', ' ') }}
+            </div>
+            <div class="info-item">
+                <strong>ชื่อผู้เช่า / Driver Name</strong>
+                {{ payment.contracts.drivers.first_name }} {{ payment.contracts.drivers.last_name }}
+            </div>
+            <div class="info-item" style="text-align: right;">
+                <strong>ทะเบียนรถ / License Plate</strong>
+                {{ payment.contracts.cars.license_plate }}
+            </div>
+            <div class="info-item" style="grid-column: span 2;">
+                <strong>ที่อยู่ / Address</strong>
+                {{ payment.contracts.drivers.address or '-' }}
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>รายการ / Description</th>
+                    <th style="text-align: right;">จำนวนเงิน / Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        {% if payment.payment_type == 'rent' %}ค่าเช่ารถปกติ (Normal Rent)
+                        {% elif payment.payment_type == 'debt' %}ผ่อนชำระหนี้ค้าง (Debt Repayment)
+                        {% elif payment.payment_type == 'deposit' %}เงินประกันความเสียหาย (Security Deposit)
+                        {% elif payment.payment_type == 'fine' %}ค่าปรับ/อื่นๆ (Fine/Other)
+                        {% else %}ชำระเงินอื่นๆ{% endif %}
+                        <br>
+                        <small style="color: #666;">{{ payment.notes or '' }}</small>
+                    </td>
+                    <td style="text-align: right;">฿{{ "{:,.2f}".format(payment.amount) }}</td>
+                </tr>
+                <tr class="total-row">
+                    <td style="text-align: right;">รวมเงินทั้งสิ้น / Total</td>
+                    <td style="text-align: right;">฿{{ "{:,.2f}".format(payment.amount) }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="footer">
+            <div class="signature">
+                ผู้รับเงิน<br>(Cashier)
+            </div>
+            <div class="signature">
+                ผู้จ่ายเงิน<br>(Customer)
+            </div>
+        </div>
+
+        <div style="margin-top: 3rem; font-size: 0.75rem; color: #999; text-align: center;">
+            ใบเสร็จรับเงินนี้จะสมบูรณ์เมื่อมีการลงชื่อผู้รับเงินเรียบร้อยแล้ว
+        </div>
+    </div>
+
+    <script>
+        // Auto print after a short delay
+        window.onload = function() {
+            setTimeout(() => {
+                // window.print();
+            }, 500);
+        };
+    </script>
+</body>
+</html>

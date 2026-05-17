@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div>
+        <h1 style="font-weight: 800;">แดชบอร์ดผู้ดูแลระบบ</h1>
+        <p style="color: var(--text-muted);">ยินดีต้อนรับกลับมา, {{ session.get('full_name') }}</p>
+    </div>
+    <div class="date-now" style="text-align: right;">
+        <span style="font-weight: 600; color: var(--primary);">{{ now }}</span>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <div class="stat-card">
+        <div>
+            <p>รถแท็กซี่ทั้งหมด</p>
+            <h3>{{ cars_count }}</h3>
+        </div>
+        <div class="icon"><i class="fa fa-car"></i></div>
+    </div>
+    <div class="stat-card">
+        <div>
+            <p>คนขับในระบบ</p>
+            <h3>{{ drivers_count }}</h3>
+        </div>
+        <div class="icon"><i class="fa fa-users"></i></div>
+    </div>
+    <div class="stat-card">
+        <div>
+            <p>สัญญาที่เปิดอยู่</p>
+            <h3>{{ active_contracts }}</h3>
+        </div>
+        <div class="icon"><i class="fa fa-file-contract"></i></div>
+    </div>
+    <div class="stat-card">
+        <div>
+            <p>รายได้วันนี้</p>
+            <h3 style="color: var(--success);">฿{{ "{:,.2f}".format(today_income) }}</h3>
+        </div>
+        <div class="icon"><i class="fa fa-coins"></i></div>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 2rem;">
+    <h2 style="margin-bottom: 1.5rem; font-weight: 700;">การดำเนินการด่วน</h2>
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <a href="{{ url_for('manage_contracts') }}" class="btn btn-primary"><i class="fa fa-plus"></i> เปิดสัญญาเช่าใหม่</a>
+        <a href="{{ url_for('manage_payments') }}" class="btn btn-primary" style="background: var(--dark);"><i class="fa fa-receipt"></i> ออกใบเสร็จรับเงิน</a>
+        <a href="{{ url_for('manage_cars') }}" class="btn btn-primary" style="background: var(--dark-secondary);"><i class="fa fa-plus-circle"></i> เพิ่มข้อมูลรถ</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taxi Meter System - ระบบจัดการรถแท็กซี่ให้เช่า</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+Thai:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% if session.get('user') %}
+    <nav class="navbar">
+        <div class="logo">TAXI METER PRO</div>
+        <div class="nav-links">
+            <span><i class="fa fa-user-circle"></i> {{ session.get('full_name') }} ({{ session.get('role') }})</span>
+            <a href="{{ url_for('logout') }}"><i class="fa fa-sign-out-alt"></i> ออกจากระบบ</a>
+        </div>
+    </nav>
+
+    <div class="sidebar">
+        {% if session.get('role') in ['super_admin', 'admin'] %}
+        <a href="{{ url_for('admin_dashboard') }}" class="sidebar-link {% if request.path == url_for('admin_dashboard') %}active{% endif %}">
+            <i class="fa fa-home"></i> &nbsp; หน้าแรก
+        </a>
+        <a href="{{ url_for('manage_cars') }}" class="sidebar-link {% if request.path == url_for('manage_cars') %}active{% endif %}">
+            <i class="fa fa-car"></i> &nbsp; จัดการข้อมูลรถ
+        </a>
+        <a href="{{ url_for('manage_drivers') }}" class="sidebar-link {% if request.path == url_for('manage_drivers') %}active{% endif %}">
+            <i class="fa fa-id-card"></i> &nbsp; ข้อมูลคนขับ
+        </a>
+        <a href="{{ url_for('manage_contracts') }}" class="sidebar-link {% if request.path == url_for('manage_contracts') %}active{% endif %}">
+            <i class="fa fa-file-contract"></i> &nbsp; สัญญาเช่ารถ
+        </a>
+        <a href="{{ url_for('manage_history') }}" class="sidebar-link {% if request.path == url_for('manage_history') %}active{% endif %}">
+            <i class="fa fa-history"></i> &nbsp; ประวัติการเช่ารถ
+        </a>
+        <a href="{{ url_for('manage_payment_history') }}" class="sidebar-link {% if request.path == url_for('manage_payment_history') %}active{% endif %}">
+            <i class="fa fa-receipt"></i> &nbsp; ประวัติการชำระเงิน
+        </a>
+        <a href="{{ url_for('manage_payments') }}" class="sidebar-link {% if request.path == url_for('manage_payments') %}active{% endif %}">
+            <i class="fa fa-money-bill-wave"></i> &nbsp; จ่ายค่าเช่า/ใบเสร็จ
+        </a>
+        <a href="{{ url_for('manage_repairs') }}" class="sidebar-link {% if request.path == url_for('manage_repairs') %}active{% endif %}">
+            <i class="fa fa-tools"></i> &nbsp; รายการซ่อม
+        </a>
+        <a href="{{ url_for('manage_reports') }}" class="sidebar-link {% if request.path == url_for('manage_reports') %}active{% endif %}">
+            <i class="fa fa-chart-line"></i> &nbsp; รายงานสรุป
+        </a>
+        <a href="{{ url_for('manage_settings') }}" class="sidebar-link {% if request.path == url_for('manage_settings') %}active{% endif %}">
+            <i class="fa fa-cog"></i> &nbsp; ตั้งค่าระบบ
+        </a>
+        {% if session.get('role') == 'super_admin' %}
+        <a href="{{ url_for('manage_staff') }}" class="sidebar-link {% if request.path == url_for('manage_staff') %}active{% endif %}">
+            <i class="fa fa-user-shield"></i> &nbsp; จัดการ Admin
+        </a>
+        {% endif %}
+        {% else %}
+        <a href="{{ url_for('driver_dashboard') }}" class="sidebar-link active">
+            <i class="fa fa-tachometer-alt"></i> &nbsp; หน้าหลักคนขับ
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="card" style="background: {% if category == 'danger' %}#fff5f5{% else %}#f0fff4{% endif %}; border-left: 5px solid {% if category == 'danger' %}var(--danger){% else %}var(--success){% endif %}; padding: 1rem; margin-bottom: 1rem;">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+    {% else %}
+    <nav class="navbar guest-navbar">
+        <div class="logo">TAXI METER <span style="color: var(--primary);">PRO</span></div>
+        <div class="nav-links">
+            <a href="/"><i class="fa fa-home"></i> หน้าแรก</a>
+            <a href="#contact"><i class="fa fa-phone"></i> ติดต่อเรา</a>
+            <a href="{{ url_for('login') }}" class="btn btn-primary" style="padding: 0.5rem 1.5rem; border-radius: 30px; margin-left: 1rem;">
+                เข้าสู่ระบบ <i class="fa fa-sign-in-alt"></i>
+            </a>
+        </div>
+    </nav>
+    {% block auth_content %}{% endblock %}
+    {% endif %}
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

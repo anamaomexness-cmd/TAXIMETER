@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h1 style="font-weight: 800;">สัญญาเช่ารถ</h1>
+    <button class="btn btn-primary" onclick="showAddContractModal()"><i class="fa fa-file-signature"></i> เปิดสัญญาเช่าใหม่</button>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ทะเบียนรถ</th>
+                    <th>ผู้เช่า</th>
+                    <th>ประเภท</th>
+                    <th>โปรโมชั่น</th>
+                    <th>วันที่เริ่ม</th>
+                    <th>สถานะ</th>
+                    <th>จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for contract in contracts %}
+                <tr>
+                    <td style="font-weight: 700;">{{ contract.cars.license_plate }}</td>
+                    <td>{{ contract.drivers.first_name }} {{ contract.drivers.last_name }}</td>
+                    <td>{{ 'ควงรถ (24 ชม)' if contract.rental_type == 'full_day' else 'กะ (12 ชม)' }}</td>
+                    <td>
+                        <span style="color: var(--primary); font-weight: 600;">
+                            {% if contract.promotion_type == '2_free_1' %}2 ฟรี 1
+                            {% elif contract.promotion_type == '3_free_1' %}3 ฟรี 1
+                            {% elif contract.promotion_type == '5_free_1' %}5 ฟรี 1
+                            {% elif contract.promotion_type == '7_free_1' %}7 ฟรี 1
+                            {% else %}ไม่มีโปรโมชั่น{% endif %}
+                        </span>
+                    </td>
+                    <td>{{ contract.start_date }}</td>
+                    <td>
+                        <span style="color: {% if contract.status == 'active' %}var(--success){% else %}var(--text-muted){% endif %}; font-weight: 600;">
+                            {{ 'ปกติ' if contract.status == 'active' else 'ปิดสัญญา' }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('print_contract', contract_id=contract.id) }}" target="_blank" class="btn" style="padding: 0.5rem; background: #edf2f7; color: var(--text-dark); margin-right: 0.5rem;">
+                            <i class="fa fa-print"></i> พิมพ์สัญญา
+                        </a>
+                        <button class="btn" onclick="showLeaveModal('{{ contract.id }}', '{{ contract.drivers.first_name }} {{ contract.drivers.last_name }}')" style="padding: 0.5rem; background: #fff5f5; color: #c53030; margin-right: 0.5rem;" title="บันทึกวันลา">
+                            <i class="fa fa-calendar-times"></i>
+                        </button>
+                        <button class="btn" onclick="viewLeaveHistory('{{ contract.id }}', '{{ contract.drivers.first_name }} {{ contract.drivers.last_name }}')" style="padding: 0.5rem; background: #e6fffa; color: #2c7a7b; margin-right: 0.5rem;" title="ดูประวัติการลา">
+                            <i class="fa fa-history"></i>
+                        </button>
+                        <button class="btn" style="padding: 0.5rem; background: #edf2f7;"><i class="fa fa-eye"></i></button>
+                        {% if contract.status == 'active' %}
+                        <a href="{{ url_for('close_contract', contract_id=contract.id) }}" class="btn" style="padding: 0.5rem; background: #fff5f5; color: #c53030; border: 1px solid #feb2b2;" title="ปิดสัญญา/คืนรถ">
+                            <i class="fa fa-times-circle"></i> ปิดสัญญา
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 3rem; color: var(--text-muted);">ไม่พบข้อมูลสัญญาในระบบ</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="addContractModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 600px; margin: 0;">
+        <h2 style="margin-bottom: 1.5rem;">เปิดสัญญาเช่าใหม่</h2>
+        <form action="{{ url_for('manage_contracts') }}" method="POST">
+            <div class="form-group">
+                <label>เลือกรถแท็กซี่</label>
+                <select name="car_id" class="form-control" required>
+                    <option value="">-- เลือกรถที่ว่าง --</option>
+                    {% for car in available_cars %}
+                    <option value="{{ car.id }}">{{ car.license_plate }} ({{ car.brand }} {{ car.model }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>เลือกคนขับ</label>
+                <select name="driver_id" class="form-control" required>
+                    <option value="">-- เลือกคนขับ --</option>
+                    {% for driver in all_drivers %}
+                    <option value="{{ driver.id }}">{{ driver.first_name }} {{ driver.last_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>ประเภทการเช่า</label>
+                    <select name="rental_type" class="form-control" required>
+                        <option value="full_day">ควงรถ (24 ชม)</option>
+                        <option value="shift_12h">กะ (12 ชม)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>อัตราค่าเช่า (บาท/วัน)</label>
+                    <input type="number" name="daily_rate" class="form-control" value="800" required>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>เลือกโปรโมชั่น</label>
+                    <select name="promotion_type" class="form-control">
+                        <option value="none">ไม่มีโปรโมชั่น</option>
+                        <option value="2_free_1">ขับ 2 วัน ฟรี 1 วัน</option>
+                        <option value="3_free_1">ขับ 3 วัน ฟรี 1 วัน</option>
+                        <option value="5_free_1">ขับ 5 วัน ฟรี 1 วัน</option>
+                        <option value="7_free_1">ขับ 7 วัน ฟรี 1 วัน</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>ผ่อนเงินประกัน (บาท/วัน)</label>
+                    <input type="number" name="deposit_installment" class="form-control" value="0">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>วันที่เริ่มสัญญา</label>
+                <input type="date" name="start_date" class="form-control" value="{{ today_str }}" required>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn" onclick="hideAddContractModal()" style="background: #e2e8f0;">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary">บันทึกสัญญา</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+</div>
+
+<!-- Leave Modal -->
+<div id="leaveModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 500px; margin: 0;">
+        <h2 style="margin-bottom: 0.5rem;">บันทึกการลาหยุด</h2>
+        <p id="leaveDriverName" style="color: var(--text-muted); margin-bottom: 1.5rem;"></p>
+        <form action="{{ url_for('manage_leaves') }}" method="POST">
+            <input type="hidden" name="contract_id" id="leaveContractId">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>วันที่เริ่มหยุด</label>
+                    <input type="date" name="start_date" class="form-control" value="{{ today_str }}" required>
+                </div>
+                <div class="form-group">
+                    <label>วันที่สิ้นสุด</label>
+                    <input type="date" name="end_date" class="form-control" value="{{ today_str }}" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>เหตุผลการลา (ถ้ามี)</label>
+                <textarea name="reason" class="form-control" rows="3" placeholder="ระบุเหตุผลการลา..."></textarea>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn" onclick="hideLeaveModal()" style="background: #e2e8f0;">ยกเลิก</button>
+                <button type="submit" class="btn" style="background: var(--danger); color: white;">บันทึกวันลา</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+
+<!-- History Modal -->
+<div id="historyModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 600px; margin: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2 style="margin: 0;">ประวัติการลาหยุด</h2>
+            <button onclick="hideHistoryModal()" style="border: none; background: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+        </div>
+        <p id="historyDriverName" style="color: var(--primary); font-weight: 700; margin-bottom: 1rem;"></p>
+        
+        <div style="max-height: 400px; overflow-y: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead style="background: #f7fafc; position: sticky; top: 0;">
+                    <tr>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">วันที่เริ่ม - สิ้นสุด</th>
+                        <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #e2e8f0;">จำนวนวัน</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">เหตุผล</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                    <!-- Data will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
+            <button type="button" class="btn" onclick="hideHistoryModal()" style="background: #e2e8f0;">ปิดหน้าต่าง</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showAddContractModal() { document.getElementById('addContractModal').style.display = 'flex'; }
+    function hideAddContractModal() { document.getElementById('addContractModal').style.display = 'none'; }
+
+    function showLeaveModal(contractId, driverName) {
+        document.getElementById('leaveContractId').value = contractId;
+        document.getElementById('leaveDriverName').innerText = "คนขับ: " + driverName;
+        document.getElementById('leaveModal').style.display = 'flex';
+    }
+    function hideLeaveModal() {
+        document.getElementById('leaveModal').style.display = 'none';
+    }
+
+    function viewLeaveHistory(contractId, driverName) {
+        document.getElementById('historyDriverName').innerText = "คนขับ: " + driverName;
+        const tbody = document.getElementById('historyTableBody');
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 2rem;">กำลังโหลดข้อมูล...</td></tr>';
+        document.getElementById('historyModal').style.display = 'flex';
+
+        fetch(`/api/leaves/${contractId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 2rem; color: var(--text-muted);">ไม่มีประวัติการลาหยุด</td></tr>';
+                } else {
+                    tbody.innerHTML = '';
+                    data.forEach(item => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td style="padding: 0.75rem; border-bottom: 1px solid #edf2f7;">${item.start_date} ถึง ${item.end_date}</td>
+                            <td style="padding: 0.75rem; border-bottom: 1px solid #edf2f7; text-align: center; font-weight: 700; color: var(--danger);">${item.days_count} วัน</td>
+                            <td style="padding: 0.75rem; border-bottom: 1px solid #edf2f7; font-size: 0.9rem;">${item.reason || '-'}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                }
+            })
+            .catch(err => {
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 2rem; color: var(--danger);">เกิดข้อผิดพลาด: ${err}</td></tr>`;
+            });
+    }
+
+    function hideHistoryModal() {
+        document.getElementById('historyModal').style.display = 'none';
+    }
+</script>
+{% endblock %}

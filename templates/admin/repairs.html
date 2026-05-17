@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h1 style="font-weight: 800;">รายการซ่อมบำรุง</h1>
+    <button class="btn btn-primary" onclick="showAddRepairModal()"><i class="fa fa-tools"></i> บันทึกรายการซ่อม</button>
+</div>
+
+<div style="margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center;">
+    <div style="position: relative; flex: 1; max-width: 400px;">
+        <i class="fa fa-search" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+        <input type="text" id="repairSearch" class="form-control" placeholder="ค้นหาด้วยทะเบียนรถ..." style="padding-left: 40px; border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>วันที่ซ่อม</th>
+                    <th>ทะเบียนรถ</th>
+                    <th>ประเภท</th>
+                    <th>รายการ</th>
+                    <th>ค่าใช้จ่าย</th>
+                    <th>จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for repair in repairs %}
+                <tr>
+                    <td>{{ repair.repair_date }}</td>
+                    <td style="font-weight: 700;">{{ repair.cars.license_plate }}</td>
+                    <td>
+                        <span style="padding: 0.2rem 0.5rem; border-radius: 5px; font-size: 0.8rem; background: {% if repair.repair_type == 'taxi' %}#fef3c7; color: #92400e;{% else %}#e2e8f0; color: #475569;{% endif %}">
+                            {{ 'แท็กซี่' if repair.repair_type == 'taxi' else 'ทั่วไป' }}
+                        </span>
+                    </td>
+                    <td>{{ repair.description }}</td>
+                    <td style="color: var(--danger); font-weight: 700;">฿{{ "{:,.2f}".format(repair.cost) }}</td>
+                    <td>
+                        <button class="btn" style="padding: 0.5rem; background: #edf2f7; color: var(--text);" onclick='showEditRepairModal({{ repair|tojson|safe }})'><i class="fa fa-edit"></i></button>
+                        <button class="btn" style="padding: 0.5rem; background: #fff5f5; color: var(--danger);" onclick="confirmDeleteRepair('{{ repair.id }}', '{{ repair.description }}')"><i class="fa fa-trash"></i></button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-muted);">ยังไม่มีบันทึกการซ่อมบำรุง</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="addRepairModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 500px; margin: 0;">
+        <h2 style="margin-bottom: 1.5rem;">บันทึกรายการซ่อมใหม่</h2>
+        <form action="{{ url_for('manage_repairs') }}" method="POST">
+            <div class="form-group">
+                <label>เลือกรถ</label>
+                <select name="car_id" class="form-control" required>
+                    <option value="">-- เลือกทะเบียนรถ --</option>
+                    {% for car in all_cars %}
+                    <option value="{{ car.id }}">{{ car.license_plate }} ({{ car.brand }} {{ car.model }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>ประเภทการซ่อม</label>
+                <select name="repair_type" class="form-control">
+                    <option value="taxi">ซ่อมแท็กซี่ (มิเตอร์/ป้าย/หลังคา)</option>
+                    <option value="general">ซ่อมรถทั่วไป (เครื่องยนต์/ช่วงล่าง)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>รายละเอียดการซ่อม</label>
+                <input type="text" name="description" class="form-control" placeholder="เช่น เปลี่ยนน้ำมันเครื่อง" required>
+            </div>
+            <div class="form-group">
+                <label>ค่าใช้จ่าย (บาท)</label>
+                <input type="number" name="cost" class="form-control" placeholder="0.00" required>
+            </div>
+            <div class="form-group">
+                <label>วันที่ซ่อม</label>
+                <input type="date" name="repair_date" class="form-control" value="{{ today_str }}" required>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn" onclick="hideAddRepairModal()" style="background: #e2e8f0;">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary">บันทึกข้อมูล</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Repair Modal -->
+<div id="editRepairModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 500px; margin: 0;">
+        <h2 style="margin-bottom: 1.5rem;">แก้ไขรายการซ่อมบำรุง</h2>
+        <form id="editRepairForm" method="POST">
+            <div class="form-group">
+                <label>เลือกรถ</label>
+                <select name="car_id" id="edit_car_id" class="form-control" required>
+                    {% for car in all_cars %}
+                    <option value="{{ car.id }}">{{ car.license_plate }} ({{ car.brand }} {{ car.model }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>ประเภทการซ่อม</label>
+                <select name="repair_type" id="edit_repair_type" class="form-control">
+                    <option value="taxi">ซ่อมแท็กซี่ (มิเตอร์/ป้าย/หลังคา)</option>
+                    <option value="general">ซ่อมรถทั่วไป (เครื่องยนต์/ช่วงล่าง)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>รายละเอียดการซ่อม</label>
+                <input type="text" name="description" id="edit_description" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>ค่าใช้จ่าย (บาท)</label>
+                <input type="number" name="cost" id="edit_cost" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>วันที่ซ่อม</label>
+                <input type="date" name="repair_date" id="edit_repair_date" class="form-control" required>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn" onclick="hideEditRepairModal()" style="background: #e2e8f0;">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary">บันทึกการแก้ไข</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Form (Hidden) -->
+<form id="deleteRepairForm" method="POST" style="display: none;"></form>
+
+<script>
+    function showAddRepairModal() { document.getElementById('addRepairModal').style.display = 'flex'; }
+    function hideAddRepairModal() { document.getElementById('addRepairModal').style.display = 'none'; }
+
+    function showEditRepairModal(repair) {
+        document.getElementById('editRepairForm').action = `/admin/repairs/edit/${repair.id}`;
+        document.getElementById('edit_car_id').value = repair.car_id;
+        document.getElementById('edit_repair_type').value = repair.repair_type;
+        document.getElementById('edit_description').value = repair.description;
+        document.getElementById('edit_cost').value = repair.cost;
+        document.getElementById('edit_repair_date').value = repair.repair_date;
+        document.getElementById('editRepairModal').style.display = 'flex';
+    }
+
+    function hideEditRepairModal() {
+        document.getElementById('editRepairModal').style.display = 'none';
+    }
+
+    function confirmDeleteRepair(repairId, description) {
+        if (confirm(`คุณต้องการลบรายการซ่อม "${description}" ใช่หรือไม่?`)) {
+            const form = document.getElementById('deleteRepairForm');
+            form.action = `/admin/repairs/delete/${repairId}`;
+            form.submit();
+        }
+    }
+
+    // ระบบค้นหาเรียลไทม์
+    document.getElementById('repairSearch').addEventListener('keyup', function() {
+        const searchValue = this.value.toLowerCase();
+        const rows = document.querySelectorAll('tbody tr');
+        
+        rows.forEach(row => {
+            const plateCell = row.querySelector('td:nth-child(2)');
+            if (plateCell) {
+                const plate = plateCell.innerText.toLowerCase();
+                if (plate.includes(searchValue)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

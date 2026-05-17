@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สัญญาเช่ารถแท็กซี่ - {{ contract.cars.license_plate }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap');
+        
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background: #f0f0f0;
+            padding: 0;
+            margin: 0;
+            color: #000;
+            line-height: 1.6;
+        }
+
+        .page {
+            background: white;
+            width: 210mm;
+            min-height: 297mm;
+            margin: 20px auto;
+            padding: 20mm;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            text-decoration: underline;
+        }
+
+        .contract-meta {
+            text-align: right;
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-weight: 700;
+            font-size: 16px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .content-row {
+            margin-bottom: 8px;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .label {
+            font-weight: 700;
+            min-width: 120px;
+        }
+
+        .value {
+            border-bottom: 1px dotted #000;
+            flex-grow: 1;
+            padding-left: 10px;
+        }
+
+        .terms {
+            font-size: 14px;
+            text-align: justify;
+            margin-top: 20px;
+        }
+
+        .terms ol {
+            padding-left: 20px;
+        }
+
+        .terms li {
+            margin-bottom: 10px;
+        }
+
+        .signatures {
+            margin-top: 50px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+        }
+
+        .signature-block {
+            text-align: center;
+        }
+
+        .sig-line {
+            border-bottom: 1px solid #000;
+            margin-bottom: 5px;
+            height: 30px;
+            width: 80%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .no-print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            background: #2d3748;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 700;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        @media print {
+            body { background: white; }
+            .page { 
+                margin: 0; 
+                box-shadow: none; 
+                width: 100%;
+                height: 100%;
+                padding: 0;
+            }
+            .no-print-btn { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <button class="no-print-btn" onclick="window.print()">สั่งพิมพ์สัญญา (A4)</button>
+
+    <div class="page">
+        <div class="header">
+            <h1>สัญญาเช่ารถยนต์ (แท็กซี่)</h1>
+        </div>
+
+        <div class="contract-meta">
+            ทำที่: ............................................................<br>
+            วันที่: {{ contract.created_at[:10] }}
+        </div>
+
+        <div class="content-row">
+            สัญญาฉบับนี้ทำขึ้นระหว่าง <strong>{{ config.get('lessor_name', '................................................') }}</strong> หมายเลขบัตรประชาชน {{ config.get('lessor_id', '................................') }} อยู่บ้านเลขที่ {{ config.get('lessor_address', '................................................................................................') }} (ผู้ให้เช่า) 
+            กับ <strong>นาย/นาง/นางสาว {{ contract.drivers.first_name }} {{ contract.drivers.last_name }}</strong> (ผู้เช่า)
+        </div>
+
+        <div class="section-title">1. ข้อมูลผู้เช่า (Lessee Information)</div>
+        <div class="content-row">
+            <span class="label">เลขบัตรประชาชน:</span>
+            <span class="value">{{ contract.drivers.id_card_number or '............................................................' }}</span>
+        </div>
+        <div class="content-row">
+            <span class="label">ที่อยู่:</span>
+            <span class="value">{{ contract.drivers.address or '........................................................................................................................' }}</span>
+        </div>
+        <div class="content-row">
+            <span class="label">เบอร์โทรศัพท์:</span>
+            <span class="value">{{ contract.drivers.phone or '................................' }}</span>
+            <span class="label" style="min-width: 100px; margin-left: 20px;">เลขที่ใบขับขี่:</span>
+            <span class="value">{{ contract.drivers.license_number or '................................' }}</span>
+        </div>
+
+        <div class="section-title">2. รายละเอียดรถที่เช่า (Vehicle Details)</div>
+        <div class="content-row">
+            <span class="label">หมายเลขทะเบียน:</span>
+            <span class="value">{{ contract.cars.license_plate }}</span>
+            <span class="label" style="min-width: 60px; margin-left: 20px;">ยี่ห้อ:</span>
+            <span class="value">{{ contract.cars.brand }} {{ contract.cars.model }}</span>
+        </div>
+
+        <div class="section-title">3. เงื่อนไขการเช่า (Rental Terms)</div>
+        <div class="content-row">
+            <span class="label">ประเภทการเช่า:</span>
+            <span class="value">
+                {% if contract.rental_type == 'full_day' %}ควงรถ (24 ชั่วโมง){% else %}กะ (12 ชั่วโมง){% endif %}
+            </span>
+        </div>
+        <div class="content-row">
+            <span class="label">อัตราค่าเช่า:</span>
+            <span class="value">฿{{ "{:,.2f}".format(contract.daily_rate) }} ต่อวัน</span>
+            <span class="label" style="min-width: 100px; margin-left: 20px;">วันที่เริ่มสัญญา:</span>
+            <span class="value">{{ contract.start_date }}</span>
+        </div>
+        <div class="content-row">
+            <span class="label">เงินประกันค้างชำระ:</span>
+            <span class="value">฿{{ "{:,.2f}".format(contract.drivers.target_deposit - contract.drivers.deposit_balance) }} (ผ่อนชำระวันละ ฿{{ "{:,.2f}".format(contract.deposit_installment or 0) }})</span>
+        </div>
+
+        <div class="section-title">4. ข้อตกลงและเงื่อนไข (Terms and Conditions)</div>
+        <div class="terms">
+            <ol>
+                <li>ผู้เช่าตกลงจะดูแลรักษารถที่เช่าเสมือนเป็นทรัพย์สินของตนเอง และจะใช้งานตามวัตถุประสงค์ของการรับจ้างสาธารณะเท่านั้น</li>
+                <li>ผู้เช่าต้องรับผิดชอบค่าเสียหายที่เกิดขึ้นจากการใช้งานผิดประเภท หรือความประมาทเลินเล่อของผู้เช่าเอง</li>
+                <li>ในกรณีเกิดอุบัติเหตุ ผู้เช่าต้องแจ้งผู้ให้เช่าทันที และรับผิดชอบค่าเสียหายส่วนแรก (Deductible) ตามที่บริษัทประกันกำหนด</li>
+                <li>การค้างชำระค่าเช่าเกิน 2 วัน ผู้ให้เช่ามีสิทธิ์บอกเลิกสัญญาและยึดรถคืนได้ทันทีโดยไม่ต้องแจ้งให้ทราบล่วงหน้า</li>
+                <li>ผู้เช่าตกลงจะไม่นำรถไปให้ผู้อื่นเช่าช่วง หรือนำไปใช้ในทางที่ผิดกฎหมายทุกประเภท</li>
+            </ol>
+        </div>
+
+        <div style="margin-top: 30px;">
+            สัญญาฉบับนี้ทำขึ้นสองฉบับมีข้อความถูกต้องตรงกัน คู่สัญญาได้อ่านและเข้าใจข้อความโดยตลอดแล้ว จึงได้ลงลายมือชื่อไว้เป็นสำคัญ
+        </div>
+
+        <div class="signatures">
+            <div class="signature-block">
+                <div class="sig-line"></div>
+                ลงชื่อ ............................................................<br>
+                ( {{ contract.drivers.first_name }} {{ contract.drivers.last_name }} )<br>
+                <strong>ผู้เช่า</strong>
+            </div>
+            <div class="signature-block">
+                <div class="sig-line"></div>
+                ลงชื่อ ............................................................<br>
+                ( {{ config.get('lessor_name', '................................................') }} )<br>
+                <strong>ผู้ให้เช่า</strong>
+            </div>
+            <div class="signature-block" style="margin-top: 20px;">
+                <div class="sig-line"></div>
+                ลงชื่อ ............................................................<br>
+                ( ............................................................ )<br>
+                <strong>พยาน</strong>
+            </div>
+            <div class="signature-block" style="margin-top: 20px;">
+                <div class="sig-line"></div>
+                ลงชื่อ ............................................................<br>
+                ( ............................................................ )<br>
+                <strong>พยาน</strong>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

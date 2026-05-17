@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap');
+        
+        body {
+            font-family: 'Sarabun', sans-serif;
+            padding: 15mm;
+            color: #333;
+            line-height: 1.5;
+            background: #fff;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 { margin: 0; font-size: 1.8rem; }
+        .header p { margin: 5px 0 0; color: #666; }
+
+        .meta {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 2rem;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-size: 0.85rem;
+        }
+
+        th { background: #f2f2f2; }
+
+        .text-right { text-align: right; }
+        .font-bold { font-weight: 700; }
+
+        .total-box {
+            float: right;
+            border: 2px solid #333;
+            padding: 1rem;
+            min-width: 200px;
+            text-align: right;
+            margin-top: 1rem;
+        }
+
+        .footer {
+            margin-top: 5rem;
+            clear: both;
+            text-align: right;
+            font-size: 0.8rem;
+            color: #999;
+        }
+
+        .no-print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #2d3748;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        @media print {
+            .no-print-btn { display: none; }
+            body { padding: 0; }
+        }
+    </style>
+</head>
+<body>
+    <button class="no-print-btn" onclick="window.print()">พิมพ์รายงาน</button>
+
+    <div class="header">
+        <h1>{{ title }}</h1>
+        <p>{{ config.get('lessor_name', 'TAXIMETER MANAGEMENT') }}</p>
+    </div>
+
+    <div class="meta">
+        <div>วันที่ออกรายงาน: {{ today.strftime('%d/%m/%Y %H:%M') }}</div>
+        <div>จำนวนรายการ: {{ payments|length }}</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>วันที่/เวลา</th>
+                <th>เลขที่ใบเสร็จ</th>
+                <th>ทะเบียนรถ</th>
+                <th>คนขับ</th>
+                <th>ประเภท</th>
+                <th class="text-right">จำนวนเงิน</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set total = 0 %}
+            {% for p in payments %}
+            <tr>
+                <td>{{ p.payment_date[:16].replace('T', ' ') }}</td>
+                <td>{{ p.receipt_no }}</td>
+                <td>{{ p.contracts.cars.license_plate }}</td>
+                <td>{{ p.contracts.drivers.first_name }} {{ p.contracts.drivers.last_name }}</td>
+                <td>
+                    {% if p.payment_type == 'rent' %}ค่าเช่า
+                    {% elif p.payment_type == 'debt' %}ผ่อนหนี้
+                    {% elif p.payment_type == 'deposit' %}เงินค้ำ
+                    {% else %}อื่นๆ{% endif %}
+                </td>
+                <td class="text-right">฿{{ "{:,.2f}".format(p.amount) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="total-box">
+        <div style="font-size: 0.9rem; color: #666;">รวมยอดเงินทั้งหมด (Total)</div>
+        <div style="font-size: 1.5rem; font-weight: 700;">
+            {% set total = payments|sum(attribute='amount') %}
+            ฿{{ "{:,.2f}".format(total) }}
+        </div>
+    </div>
+
+    <div class="footer">
+        ผู้ออกรายงาน: {{ session.get('full_name') }}<br>
+        เอกสารชุดนี้เป็นหลักฐานสรุปการรับเงินตามระบบ TAXIMETER PRO
+    </div>
+</body>
+</html>

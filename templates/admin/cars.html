@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; gap: 1rem; flex-wrap: wrap;">
+    <h1 style="font-weight: 800;">จัดการข้อมูลรถ</h1>
+    <div style="display: flex; gap: 1rem; flex: 1; max-width: 600px;">
+        <input type="text" id="carSearchInput" placeholder="ค้นหาด้วยทะเบียน, ยี่ห้อ, รุ่น..." class="form-control" style="flex: 1;">
+        <button class="btn btn-primary" onclick="showAddCarModal()" style="white-space: nowrap;"><i class="fa fa-plus"></i> เพิ่มรถใหม่</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>รูปภาพ (คลิกขยาย)</th>
+                    <th>ทะเบียนรถ</th>
+                    <th>ยี่ห้อ/รุ่น</th>
+                    <th>ประเภท</th>
+                    <th>สถานะ</th>
+                    <th>วันที่บันทึก</th>
+                    <th>จัดการ</th>
+                </tr>
+            </thead>
+            <tbody id="carTableBody">
+                {% for car in cars %}
+                <tr class="car-row" data-license="{{ car.license_plate }}" data-brand="{{ car.brand }}" data-model="{{ car.model }}">
+                    <td>
+                        <div style="display: flex; gap: 5px; flex-wrap: wrap; max-width: 200px;">
+                            {% if car.images and car.images|length > 0 %}
+                                {# Show only the first image as a thumbnail #}
+                                <div style="position: relative; cursor: pointer;" onclick='openGallery({{ car.images|tojson|safe }}, 0)'>
+                                    <img src="{{ car.images[0] }}" 
+                                         style="width: 60px; height: 45px; object-fit: cover; border-radius: 5px; border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                                    {% if car.images|length > 1 %}
+                                        <span style="position: absolute; bottom: 0; right: 0; background: rgba(0,0,0,0.7); color: white; font-size: 0.7rem; padding: 2px 5px; border-radius: 3px;">
+                                            +{{ car.images|length - 1 }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span style="font-size: 0.8rem; color: var(--text-muted);">ไม่มีรูป</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td style="font-weight: 700;">{{ car.license_plate }}</td>
+                    <td>{{ car.brand }} {{ car.model }}</td>
+                    <td>
+                        <span style="font-size: 0.85rem; padding: 2px 8px; border-radius: 5px; background: {% if car.car_type == 'taxi' %}#fef3c7; color: #92400e;{% else %}#e2e8f0; color: #475569;{% endif %}">
+                            {{ 'แท็กซี่' if car.car_type == 'taxi' else 'รถทั่วไป' }}
+                        </span>
+                    </td>
+                    <td>
+                        <span style="padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; 
+                            background: {% if car.status == 'available' %}#e6fffa; color: #234e52;{% elif car.status == 'rented' %}#ebf8ff; color: #2c5282;{% else %}#fff5f5; color: #742a2a;{% endif %}">
+                            {% if car.status == 'available' %}ว่าง{% elif car.status == 'rented' %}เช่าอยู่{% else %}ซ่อมบำรุง{% endif %}
+                        </span>
+                    </td>
+                    <td>{{ car.created_at[:10] }}</td>
+                    <td>
+                        <button class="btn" style="padding: 0.5rem; background: #edf2f7; color: var(--text);" onclick='showEditCarModal({{ car|tojson|safe }})'><i class="fa fa-edit"></i></button>
+                        <button class="btn" style="padding: 0.5rem; background: #fff5f5; color: var(--danger);" onclick="confirmDeleteCar('{{ car.id }}', '{{ car.license_plate }}')"><i class="fa fa-trash"></i></button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 3rem; color: var(--text-muted);">ไม่พบข้อมูลรถในระบบ</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Placeholder (Simplified) -->
+<div id="addCarModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; overflow-y: auto; padding: 20px;">
+    <div class="card" style="width: 100%; max-width: 500px; margin: 2rem auto;">
+        <h2 style="margin-bottom: 1.5rem;">เพิ่มรถใหม่</h2>
+        <form action="{{ url_for('manage_cars') }}" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>ทะเบียนรถ</label>
+                <input type="text" name="license_plate" class="form-control" placeholder="กข 1234 กทม" required>
+            </div>
+            <div class="form-group">
+                <label>ยี่ห้อ</label>
+                <input type="text" name="brand" class="form-control" placeholder="Toyota" required>
+            </div>
+            <div class="form-group">
+                <label>รุ่น</label>
+                <input type="text" name="model" class="form-control" placeholder="Altis" required>
+            </div>
+            <div class="form-group">
+                <label>ประเภทรถ</label>
+                <select name="car_type" class="form-control">
+                    <option value="taxi">รถแท็กซี่</option>
+                    <option value="general">รถทั่วไป</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>รูปภาพรถ (อัปโหลดไฟล์ - สูงสุด 10 รูป)</label>
+                <input type="file" name="car_images" class="form-control" accept="image/*" multiple>
+                <small style="color: var(--text-muted); display: block; margin-top: 5px;">คุณสามารถเลือกไฟล์รูปภาพจากเครื่องได้สูงสุด 10 รูป</small>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn" onclick="hideAddCarModal()" style="background: #e2e8f0;">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary">บันทึกข้อมูล</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Car Modal -->
+<div id="editCarModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; overflow-y: auto; padding: 20px;">
+    <div class="card" style="width: 100%; max-width: 500px; margin: 2rem auto;">
+        <h2 style="margin-bottom: 1.5rem;">แก้ไขข้อมูลรถ</h2>
+        <form id="editCarForm" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>ทะเบียนรถ</label>
+                <input type="text" name="license_plate" id="edit_license_plate" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>ยี่ห้อ</label>
+                <input type="text" name="brand" id="edit_brand" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>รุ่น</label>
+                <input type="text" name="model" id="edit_model" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>ประเภทรถ</label>
+                <select name="car_type" id="edit_car_type" class="form-control">
+                    <option value="taxi">รถแท็กซี่</option>
+                    <option value="general">รถทั่วไป</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>สถานะ</label>
+                <select name="status" id="edit_status" class="form-control">
+                    <option value="available">ว่าง</option>
+                    <option value="rented">เช่าอยู่</option>
+                    <option value="maintenance">ซ่อมบำรุง</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>จัดการรูปภาพเดิม</label>
+                <div id="existing_images_container" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px dashed #cbd5e0;">
+                    <!-- รูปภาพเดิมจะถูกโหลดมาใส่ตรงนี้ด้วย JS -->
+                </div>
+                <input type="hidden" name="kept_images" id="kept_images_input">
+            </div>
+
+            <div class="form-group">
+                <label>เพิ่มรูปภาพใหม่ (สูงสุด 10 รูป)</label>
+                <input type="file" name="car_images" class="form-control" accept="image/*" multiple>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn" onclick="hideEditCarModal()" style="background: #e2e8f0;">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary">บันทึกการแก้ไข</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Form (Hidden) -->
+<form id="deleteCarForm" method="POST" style="display: none;"></form>
+
+<!-- Lightbox Modal -->
+<div id="lightbox" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 3000; justify-content: center; align-items: center;">
+    <div onclick="closeLightbox()" style="position: absolute; top: 20px; right: 30px; color: white; font-size: 3rem; cursor: pointer; z-index: 3001;">&times;</div>
+    
+    <!-- ปุ่มเลื่อนซ้าย -->
+    <div id="prevBtn" onclick="prevImage()" style="position: absolute; left: 20px; color: white; font-size: 3rem; cursor: pointer; user-select: none; padding: 20px;">&#10094;</div>
+    
+    <img id="lightboxImg" src="" style="max-width: 85%; max-height: 85%; border-radius: 5px; box-shadow: 0 0 50px rgba(0,0,0,0.5); border: 3px solid white;">
+    
+    <!-- ปุ่มเลื่อนขวา -->
+    <div id="nextBtn" onclick="nextImage()" style="position: absolute; right: 20px; color: white; font-size: 3rem; cursor: pointer; user-select: none; padding: 20px;">&#10095;</div>
+    
+    <div id="imageCounter" style="position: absolute; bottom: 20px; color: white; font-size: 1rem; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px;"></div>
+</div>
+
+<script>
+    let currentGallery = [];
+    let currentIndex = 0;
+
+    function showAddCarModal() { document.getElementById('addCarModal').style.display = 'flex'; }
+    function hideAddCarModal() { document.getElementById('addCarModal').style.display = 'none'; }
+
+    let keptImages = [];
+
+    function showEditCarModal(car) {
+        document.getElementById('editCarForm').action = `/admin/cars/edit/${car.id}`;
+        document.getElementById('edit_license_plate').value = car.license_plate;
+        document.getElementById('edit_brand').value = car.brand;
+        document.getElementById('edit_model').value = car.model;
+        document.getElementById('edit_car_type').value = car.car_type || 'taxi';
+        document.getElementById('edit_status').value = car.status;
+        
+        // จัดการรูปภาพเดิม
+        keptImages = car.images || [];
+        renderExistingImages();
+        
+        document.getElementById('editCarModal').style.display = 'flex';
+    }
+
+    function renderExistingImages() {
+        const container = document.getElementById('existing_images_container');
+        const hiddenInput = document.getElementById('kept_images_input');
+        
+        hiddenInput.value = JSON.stringify(keptImages);
+        container.innerHTML = '';
+        
+        if (keptImages.length === 0) {
+            container.innerHTML = '<span style="color: #a0aec0; font-size: 0.85rem;">ไม่มีรูปภาพเดิม</span>';
+            return;
+        }
+        
+        keptImages.forEach((url, index) => {
+            const div = document.createElement('div');
+            div.style.cssText = 'position: relative; width: 80px; height: 60px;';
+            div.innerHTML = `
+                <img src="${url}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;">
+                <button type="button" onclick="removeExistingImage(${index})" 
+                        style="position: absolute; top: -5px; right: -5px; background: #e53e3e; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center;">
+                    &times;
+                </button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function removeExistingImage(index) {
+        keptImages.splice(index, 1);
+        renderExistingImages();
+    }
+
+    function hideEditCarModal() {
+        document.getElementById('editCarModal').style.display = 'none';
+    }
+
+    function confirmDeleteCar(carId, licensePlate) {
+        if (confirm(`คุณต้องการลบรถทะเบียน ${licensePlate} ใช่หรือไม่?`)) {
+            const form = document.getElementById('deleteCarForm');
+            form.action = `/admin/cars/delete/${carId}`;
+            form.submit();
+        }
+    }
+    
+    function openGallery(images, index) {
+        currentGallery = images;
+        currentIndex = index;
+        updateLightbox();
+        document.getElementById('lightbox').style.display = 'flex';
+    }
+
+    function updateLightbox() {
+        const img = document.getElementById('lightboxImg');
+        const counter = document.getElementById('imageCounter');
+        
+        img.src = currentGallery[currentIndex];
+        counter.innerText = `รูปที่ ${currentIndex + 1} / ${currentGallery.length}`;
+        
+        // ซ่อนปุ่มถ้ามีรูปเดียว
+        document.getElementById('prevBtn').style.visibility = currentGallery.length > 1 ? 'visible' : 'hidden';
+        document.getElementById('nextBtn').style.visibility = currentGallery.length > 1 ? 'visible' : 'hidden';
+    }
+
+    function nextImage() {
+        currentIndex = (currentIndex + 1) % currentGallery.length;
+        updateLightbox();
+    }
+
+    function prevImage() {
+        currentIndex = (currentIndex - 1 + currentGallery.length) % currentGallery.length;
+        updateLightbox();
+    }
+    
+    function closeLightbox() {
+        document.getElementById('lightbox').style.display = 'none';
+    }
+
+    // รองรับการกดปุ่มลูกศรที่คีย์บอร์ด
+    document.addEventListener('keydown', function(e) {
+        if (document.getElementById('lightbox').style.display === 'flex') {
+            if (e.key === 'ArrowRight') nextImage();
+            if (e.key === 'ArrowLeft') prevImage();
+            if (e.key === 'Escape') closeLightbox();
+        }
+    });
+
+    // Real-time Search Logic
+    document.getElementById('carSearchInput').addEventListener('input', function(e) {
+        const query = e.target.value.toLowerCase();
+        const rows = document.querySelectorAll('.car-row');
+        
+        rows.forEach(row => {
+            const license = row.getAttribute('data-license').toLowerCase();
+            const brand = row.getAttribute('data-brand').toLowerCase();
+            const model = row.getAttribute('data-model').toLowerCase();
+            
+            if (license.includes(query) || brand.includes(query) || model.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+</script>
+{% endblock %}

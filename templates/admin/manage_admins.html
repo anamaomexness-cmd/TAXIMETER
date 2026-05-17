@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div>
+        <h1 style="font-weight: 800;">จัดการผู้ดูแลระบบ</h1>
+        <p style="color: var(--text-muted);">จัดการสิทธิ์ทีมงาน (Admin) ของคุณ</p>
+    </div>
+    <button class="btn btn-primary" onclick="showAddAdminModal()"><i class="fa fa-user-shield"></i> เพิ่ม Admin ใหม่</button>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ชื่อ-นามสกุล</th>
+                    <th>สถานะ (Role)</th>
+                    <th>วันที่เข้าร่วม</th>
+                    <th>จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for staff in staff_list %}
+                <tr>
+                    <td style="font-weight: 700;">{{ staff.full_name }}</td>
+                    <td>
+                        <span style="padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; 
+                            background: {% if staff.role == 'super_admin' %}#fff5f5; color: #742a2a;{% else %}#ebf8ff; color: #2c5282;{% endif %}">
+                            {{ 'Super Admin' if staff.role == 'super_admin' else 'Admin' }}
+                        </span>
+                    </td>
+                    <td>{{ staff.created_at[:10] }}</td>
+                    <td>
+                        {% if staff.role != 'super_admin' %}
+                        <button class="btn" style="padding: 0.5rem; background: #fff5f5; color: var(--danger);"><i class="fa fa-trash"></i></button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="addAdminModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 500px; margin: 0;">
+        <h2 style="margin-bottom: 1.5rem;">เพิ่มผู้ดูแลระบบ (Admin)</h2>
+        <form action="{{ url_for('manage_staff') }}" method="POST">
+            <div class="form-group">
+                <label>ชื่อ-นามสกุล</label>
+                <input type="text" name="full_name" class="form-control" placeholder="ชื่อ Admin" required>
+            </div>
+            <div class="form-group">
+                <label>อีเมล (สำหรับล็อกอิน)</label>
+                <input type="email" name="email" class="form-control" placeholder="admin@example.com" required>
+            </div>
+            <div class="form-group">
+                <label>รหัสผ่าน</label>
+                <div class="password-wrapper">
+                    <input type="password" name="password" id="adminPassword" class="form-control" placeholder="อย่างน้อย 6 ตัวอักษร" required>
+                    <i class="fa fa-eye password-toggle" id="adminToggle" onclick="togglePassword('adminPassword', 'adminToggle')"></i>
+                </div>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn" onclick="hideAddAdminModal()" style="background: #e2e8f0;">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary">สร้างบัญชี Admin</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function showAddAdminModal() { document.getElementById('addAdminModal').style.display = 'flex'; }
+    function hideAddAdminModal() { document.getElementById('addAdminModal').style.display = 'none'; }
+</script>
+{% endblock %}

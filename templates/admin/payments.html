@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h1 style="font-weight: 800;">รายการรับชำระเงิน</h1>
+    <button class="btn btn-primary" onclick="showAddPaymentModal()"><i class="fa fa-plus"></i> ออกใบเสร็จใหม่</button>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>เลขที่ใบเสร็จ</th>
+                    <th>ผู้เช่า/รถ</th>
+                    <th>วันที่ชำระ</th>
+                    <th>จำนวนเงิน</th>
+                    <th>ประเภท</th>
+                    <th>จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                <tr>
+                    <td style="font-weight: 700;">{{ payment.receipt_no }}</td>
+                    <td>
+                        {{ payment.contracts.drivers.first_name }} {{ payment.contracts.drivers.last_name }}<br>
+                        <small style="color: var(--text-muted);">ทะเบียน: {{ payment.contracts.cars.license_plate }}</small>
+                    </td>
+                    <td>{{ payment.payment_date[:16].replace('T', ' ') }}</td>
+                    <td style="color: var(--success); font-weight: 700;">฿{{ "{:,.2f}".format(payment.amount) }}</td>
+                    <td>
+                        {% if payment.payment_type == 'rent' %}ค่าเช่า
+                        {% elif payment.payment_type == 'deposit' %}เงินค้ำ
+                        {% elif payment.payment_type == 'debt' %}<span style="color: var(--danger);">ผ่อนหนี้</span>
+                        {% else %}อื่นๆ{% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('print_receipt', payment_id=payment.id) }}" target="_blank" class="btn" style="padding: 0.5rem; background: #edf2f7; color: var(--primary);" title="ดูใบเสร็จ"><i class="fa fa-print"></i></a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-muted);">ยังไม่มีรายการรับชำระเงิน</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="addPaymentModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 500px; margin: 0;">
+        <h2 style="margin-bottom: 1.5rem;">บันทึกการรับเงิน</h2>
+        <form action="{{ url_for('manage_payments') }}" method="POST">
+            <div class="form-group">
+                <label>เลือกสัญญาเช่า</label>
+                <select name="contract_id" id="contractSelect" class="form-control" required onchange="fetchDebtInfo()">
+                    <option value="">-- เลือกสัญญาที่ยังเปิดอยู่ --</option>
+                    {% for contract in active_contracts %}
+                    <option value="{{ contract.id }}">{{ contract.cars.license_plate }} - {{ contract.drivers.first_name }} {{ contract.drivers.last_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div id="debtInfoArea" style="display: none; background: #fff5f5; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #feb2b2;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #c53030; font-weight: 600;">ยอดหนี้ค้างชำระ:</span>
+                    <span id="debtAmount" style="color: #c53030; font-weight: 800; font-size: 1.2rem;">฿0.00</span>
+                </div>
+                <div style="font-size: 0.85rem; color: #742a2a; margin-top: 0.5rem;" id="debtDetail">
+                    กำลังคำนวณ...
+                </div>
+            </div>
+            <div class="form-group">
+                <label>จำนวนเงินที่รับ (บาท)</label>
+                <input type="number" name="amount" class="form-control" placeholder="0.00" required>
+            </div>
+            <div class="form-group">
+                <label>ประเภทการรับเงิน</label>
+                <select name="payment_type" id="paymentType" class="form-control" onchange="autoFillAmount()">
+                    <option value="rent">ค่าเช่ารถปกติ</option>
+                    <option value="debt">ผ่อนชำระหนี้ค้าง</option>
+                    <option value="deposit">เงินค้ำประกัน</option>
+                    <option value="fine">ค่าปรับ/อื่นๆ</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>หมายเหตุ</label>
+                <textarea name="notes" class="form-control" rows="2"></textarea>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn" onclick="hideAddPaymentModal()" style="background: #e2e8f0;">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary">บันทึกและออกใบเสร็จ</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function showAddPaymentModal() { document.getElementById('addPaymentModal').style.display = 'flex'; }
+    function hideAddPaymentModal() { 
+        document.getElementById('addPaymentModal').style.display = 'none'; 
+        document.getElementById('debtInfoArea').style.display = 'none';
+    }
+
+    let currentDailyRate = 0;
+    let currentDebt = 0;
+
+    async function fetchDebtInfo() {
+        const contractId = document.getElementById('contractSelect').value;
+        const infoArea = document.getElementById('debtInfoArea');
+        if (!contractId) {
+            infoArea.style.display = 'none';
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/contract_debt/${contractId}`);
+            const data = await response.json();
+            
+            if (data.error) throw new Error(data.error);
+
+            currentDailyRate = data.daily_rate;
+            currentDebt = data.debt;
+
+            document.getElementById('debtAmount').innerText = `฿${data.debt.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            document.getElementById('debtDetail').innerText = `อัตราค่าเช่า: ฿${data.daily_rate}/วัน | เริ่มสัญญา: ${data.start_date}`;
+            infoArea.style.display = 'block';
+            
+            autoFillAmount();
+        } catch (error) {
+            console.error('Error fetching debt:', error);
+        }
+    }
+
+    function autoFillAmount() {
+        const type = document.getElementById('paymentType').value;
+        const amountInput = document.querySelector('input[name="amount"]');
+        
+        if (type === 'rent') {
+            amountInput.value = currentDailyRate;
+        } else if (type === 'debt') {
+            amountInput.value = currentDebt > 0 ? currentDebt : 0;
+        }
+    }
+</script>
+{% endblock %}
