@@ -1321,6 +1321,39 @@ def print_ledger_report():
         tx['running_balance'] = current_running
         report_txs.append(tx)
 
+    # Split into income and expense transactions for T-account layout
+    income_txs = []
+    expense_txs = []
+    total_income_sum = 0
+    total_expense_sum = 0
+    
+    for tx in report_txs:
+        cat = tx['category']
+        amt = float(tx['amount'])
+        if cat in ['income', 'bank_withdrawal']:
+            income_txs.append(tx)
+            total_income_sum += amt
+        elif cat in ['expense', 'bank_deposit']:
+            expense_txs.append(tx)
+            total_expense_sum += amt
+
+    left_beginning = 0
+    right_beginning = 0
+    if beginning_balance >= 0:
+        left_beginning = beginning_balance
+    else:
+        right_beginning = abs(beginning_balance)
+
+    left_ending = 0
+    right_ending = 0
+    if current_running >= 0:
+        right_ending = current_running
+    else:
+        left_ending = abs(current_running)
+
+    grand_total_left = left_beginning + total_income_sum + left_ending
+    grand_total_right = right_beginning + total_expense_sum + right_ending
+
     try:
         start_dt = datetime.strptime(start_date, '%Y-%m-%d')
         end_dt = datetime.strptime(end_date, '%Y-%m-%d')
@@ -1337,6 +1370,16 @@ def print_ledger_report():
 
     return render_template('admin/ledger_report_print.html',
                            transactions=report_txs,
+                           income_txs=income_txs,
+                           expense_txs=expense_txs,
+                           left_beginning=left_beginning,
+                           right_beginning=right_beginning,
+                           left_ending=left_ending,
+                           right_ending=right_ending,
+                           grand_total_left=grand_total_left,
+                           grand_total_right=grand_total_right,
+                           total_income_sum=total_income_sum,
+                           total_expense_sum=total_expense_sum,
                            start_date=start_thai,
                            end_date=end_thai,
                            method_filter=method_filter,

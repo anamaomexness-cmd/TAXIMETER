@@ -77,25 +77,47 @@
             font-weight: 700;
             color: var(--primary);
         }
+        .t-account-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border: 2px solid var(--primary);
+            margin-bottom: 25px;
+            border-radius: 6px;
+            overflow: hidden;
+            background-color: #fff;
+        }
+        .t-column {
+            display: flex;
+            flex-direction: column;
+        }
+        .t-header {
+            background-color: var(--primary);
+            color: white;
+            margin: 0;
+            padding: 12px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 25px;
+            flex: 1;
         }
         th {
-            background-color: var(--primary);
-            color: white;
-            font-weight: 600;
+            background-color: #edf2f7;
+            color: var(--text);
+            font-weight: 700;
             text-align: left;
-            padding: 10px 8px;
-            font-size: 12px;
-            border: 1px solid var(--primary);
+            padding: 8px;
+            font-size: 11px;
+            border-bottom: 2px solid var(--border);
         }
         td {
             padding: 8px;
-            border-bottom: 1px solid var(--border);
-            border-left: 1px solid #e2e8f0;
-            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #edf2f7;
+            font-size: 12px;
         }
         .text-right {
             text-align: right;
@@ -106,22 +128,29 @@
         .font-bold {
             font-weight: 700;
         }
-        .beginning-row {
-            background-color: #edf2f7;
-            font-weight: 600;
-        }
-        .ending-row {
-            background-color: #ebf8ff;
-            font-weight: 700;
-        }
         .income-text {
             color: #2f855a;
         }
         .expense-text {
             color: #c53030;
         }
+        .special-row {
+            background-color: #f7fafc;
+            font-weight: 600;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+        .total-box {
+            background-color: #edf2f7;
+            border-top: 2px solid var(--primary);
+            padding: 12px 10px;
+            display: flex;
+            justify-content: space-between;
+            font-weight: 800;
+            font-size: 13px;
+        }
         .footer {
-            margin-top: 50px;
+            margin-top: 40px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -162,7 +191,7 @@
             }
             @page {
                 size: A4;
-                margin: 1.5cm;
+                margin: 1.2cm;
             }
         }
     </style>
@@ -184,7 +213,7 @@
             {% endif %}
         </div>
         <div class="report-title">
-            <h2>รายงานบัญชีแยกประเภท</h2>
+            <h2>รายงานบัญชีเงินสด/บัญชีแยกประเภท</h2>
             <p>ช่วงวันที่: {{ start_date }} ถึง {{ end_date }}</p>
             <p>บัญชี: {% if method_filter == 'all' %}เงินสด & ธนาคารทั้งหมด{% elif method_filter == 'cash' %}เฉพาะเงินสดในมือ (Cash Hand){% else %}เฉพาะบัญชีธนาคาร (Bank Balance){% endif %}</p>
         </div>
@@ -196,79 +225,142 @@
             <span class="value">฿{{ "{:,.2f}".format(beginning_balance) }}</span>
         </div>
         <div class="meta-card">
-            <span class="label">รายรับระหว่างงวด (Period Receipts)</span>
-            <span class="value" style="color: #2f855a;">฿{{ "{:,.2f}".format(total_income) }}</span>
+            <span class="label">รายรับ / เงินถอน (Total Receipts)</span>
+            <span class="value" style="color: #2f855a;">฿{{ "{:,.2f}".format(total_income_sum) }}</span>
         </div>
         <div class="meta-card">
-            <span class="label">รายจ่ายระหว่างงวด (Period Expenses)</span>
-            <span class="value" style="color: #c53030;">฿{{ "{:,.2f}".format(total_expense) }}</span>
+            <span class="label">รายจ่าย / เงินฝาก (Total Payments)</span>
+            <span class="value" style="color: #c53030;">฿{{ "{:,.2f}".format(total_expense_sum) }}</span>
         </div>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th style="width: 12%;" class="text-center">วัน-เวลาบันทึก</th>
-                <th style="width: 15%;">ประเภทธุรกรรม</th>
-                <th style="width: 15%;">ช่องทาง</th>
-                <th>คำอธิบายรายการ</th>
-                <th style="width: 15%; text-align: right;">จำนวนเงิน</th>
-                <th style="width: 15%; text-align: right;">ยอดคงเหลือสะสม</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Beginning Balance row -->
-            <tr class="beginning-row">
-                <td class="text-center">-</td>
-                <td colspan="3">ยอดยกมาสะสม ณ วันที่ {{ start_date }} (Beginning Balance Carried Forward)</td>
-                <td class="text-right">-</td>
-                <td class="text-right">฿{{ "{:,.2f}".format(beginning_balance) }}</td>
-            </tr>
-
-            {% for tx in transactions %}
-            <tr>
-                <td class="text-center">{{ tx.transaction_date[:10] }}</td>
-                <td>
-                    {% if tx.category == 'income' %}
-                    <span class="income-text"><i class="fa fa-plus-circle"></i> รายรับ</span>
-                    {% elif tx.category == 'expense' %}
-                    <span class="expense-text"><i class="fa fa-minus-circle"></i> รายจ่าย</span>
-                    {% elif tx.category == 'bank_deposit' %}
-                    <span><i class="fa fa-arrow-right"></i> นำฝากธนาคาร</span>
-                    {% elif tx.category == 'bank_withdrawal' %}
-                    <span><i class="fa fa-arrow-left"></i> ถอนเงินสด</span>
+    <div class="t-account-container">
+        <!-- LEFT COLUMN: Receipts (รายรับ) -->
+        <div class="t-column" style="border-right: 2px solid var(--primary);">
+            <div class="t-header" style="background-color: #2f855a;">
+                <i class="fa fa-arrow-down"></i> ฝั่งรายรับ (Cash Receipts)
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 22%; text-align: center;">วันที่</th>
+                        <th>คำอธิบายรายการ</th>
+                        <th style="width: 28%; text-align: right;">จำนวนเงิน</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Beginning Balance if positive -->
+                    {% if left_beginning > 0 %}
+                    <tr class="special-row">
+                        <td class="text-center">{{ start_date }}</td>
+                        <td>ยอดยกมาสะสม (Beginning Balance)</td>
+                        <td class="text-right">฿{{ "{:,.2f}".format(left_beginning) }}</td>
+                    </tr>
                     {% endif %}
-                </td>
-                <td>
-                    {% if tx.payment_method == 'cash' %}
-                    <span>เงินสด</span>
-                    {% else %}
-                    <span>ธนาคาร</span>
-                    {% endif %}
-                </td>
-                <td>{{ tx.description }}</td>
-                <td class="text-right font-bold {% if tx.category == 'income' %}income-text{% elif tx.category == 'expense' %}expense-text{% endif %}">
-                    {% if tx.category == 'income' %}+{% elif tx.category == 'expense' %}-{% endif %}฿{{ "{:,.2f}".format(tx.amount) }}
-                </td>
-                <td class="text-right font-bold">฿{{ "{:,.2f}".format(tx.running_balance) }}</td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="6" class="text-center" style="padding: 20px; color: #718096;">
-                    ไม่มีรายการธุรกรรมในระหว่างงวดเวลานี้
-                </td>
-            </tr>
-            {% endfor %}
 
-            <!-- Ending Balance row -->
-            <tr class="ending-row">
-                <td class="text-center">-</td>
-                <td colspan="3">ยอดยกไปสะสม ณ วันที่ {{ end_date }} (Ending Balance Carried Over)</td>
-                <td class="text-right">-</td>
-                <td class="text-right">฿{{ "{:,.2f}".format(ending_balance) }}</td>
-            </tr>
-        </tbody>
-    </table>
+                    {% for tx in income_txs %}
+                    <tr>
+                        <td class="text-center" style="color: #718096; font-size: 11px;">{{ tx.transaction_date[:10] }}</td>
+                        <td>
+                            {% if tx.category == 'bank_withdrawal' %}
+                            <span class="income-text" style="font-weight: 700;">[ถอนเงินธนาคาร]</span>
+                            {% endif %}
+                            {{ tx.description }}
+                        </td>
+                        <td class="text-right font-bold income-text">฿{{ "{:,.2f}".format(tx.amount) }}</td>
+                    </tr>
+                    {% endfor %}
+
+                    <!-- Fill empty space so columns look neat -->
+                    {% if income_txs|length < expense_txs|length %}
+                        {% for i in range(expense_txs|length - income_txs|length) %}
+                        <tr>
+                            <td class="text-center" style="color: transparent;">-</td>
+                            <td style="color: transparent;">-</td>
+                            <td style="color: transparent;">-</td>
+                        </tr>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- Left Ending Balance (Only if ending balance is negative / Deficit) -->
+                    {% if left_ending > 0 %}
+                    <tr class="special-row" style="background-color: #fff5f5;">
+                        <td class="text-center">-</td>
+                        <td class="expense-text">ยอดดุลรวมรายจ่ายมากกว่ารายรับ (Deficit)</td>
+                        <td class="text-right font-bold expense-text">฿{{ "{:,.2f}".format(left_ending) }}</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            <div class="total-box" style="border-top: 2px solid #2f855a;">
+                <span>ยอดดุลรวมฝั่งซ้าย</span>
+                <span class="income-text">฿{{ "{:,.2f}".format(grand_total_left) }}</span>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Payments (รายจ่าย) -->
+        <div class="t-column">
+            <div class="t-header" style="background-color: #c53030;">
+                <i class="fa fa-arrow-up"></i> ฝั่งรายจ่าย (Cash Payments)
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 22%; text-align: center;">วันที่</th>
+                        <th>คำอธิบายรายการ</th>
+                        <th style="width: 28%; text-align: right;">จำนวนเงิน</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Beginning Balance if negative -->
+                    {% if right_beginning > 0 %}
+                    <tr class="special-row">
+                        <td class="text-center">{{ start_date }}</td>
+                        <td>ยอดยกมาติดลบสะสม (Beginning Deficit)</td>
+                        <td class="text-right">฿{{ "{:,.2f}".format(right_beginning) }}</td>
+                    </tr>
+                    {% endif %}
+
+                    {% for tx in expense_txs %}
+                    <tr>
+                        <td class="text-center" style="color: #718096; font-size: 11px;">{{ tx.transaction_date[:10] }}</td>
+                        <td>
+                            {% if tx.category == 'bank_deposit' %}
+                            <span class="expense-text" style="font-weight: 700;">[ฝากเงินธนาคาร]</span>
+                            {% endif %}
+                            {{ tx.description }}
+                        </td>
+                        <td class="text-right font-bold expense-text">฿{{ "{:,.2f}".format(tx.amount) }}</td>
+                    </tr>
+                    {% endfor %}
+
+                    <!-- Fill empty space so columns look neat -->
+                    {% if expense_txs|length < income_txs|length %}
+                        {% for i in range(income_txs|length - expense_txs|length) %}
+                        <tr>
+                            <td class="text-center" style="color: transparent;">-</td>
+                            <td style="color: transparent;">-</td>
+                            <td style="color: transparent;">-</td>
+                        </tr>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- Right Ending Balance (Only if ending balance is positive) -->
+                    {% if right_ending > 0 %}
+                    <tr class="special-row" style="background-color: #ebf8ff;">
+                        <td class="text-center">-</td>
+                        <td style="color: #2b6cb0;">ยอดยกไปสะสมปลายงวด (Ending Balance)</td>
+                        <td class="text-right font-bold" style="color: #2b6cb0;">฿{{ "{:,.2f}".format(right_ending) }}</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            <div class="total-box" style="border-top: 2px solid #c53030;">
+                <span>ยอดดุลรวมฝั่งขวา</span>
+                <span class="expense-text">฿{{ "{:,.2f}".format(grand_total_right) }}</span>
+            </div>
+        </div>
+    </div>
 
     <div class="footer">
         <div style="font-size: 11px; color: #718096;">
