@@ -1221,6 +1221,132 @@ def delete_ledger_transaction(tx_id):
         flash(f"เกิดข้อผิดพลาดในการลบ: {str(e)}", "danger")
     return redirect(url_for('manage_ledger'))
 
+@app.route('/admin/ledger/print')
+@admin_required
+def print_ledger_report():
+    client = supabase_admin if supabase_admin else supabase
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    method_filter = request.args.get('method', 'all')  # 'all', 'cash', 'bank'
+
+    if not start_date:
+        start_date = date.today().replace(day=1).isoformat()
+    if not end_date:
+        end_date = date.today().isoformat()
+
+    try:
+        txs = client.table('ledger_transactions').select('*').order('transaction_date', desc=False).order('created_at', desc=False).execute().data
+    except Exception as e:
+        print(f"Error fetching ledger for print: {e}")
+        txs = []
+
+    beginning_balance = 0
+    period_transactions = []
+    
+    total_income = 0
+    total_expense = 0
+    
+    for tx in txs:
+        cat = tx['category']
+        method = tx['payment_method']
+        amt = float(tx['amount'])
+        
+        effect = 0
+        if cat == 'income':
+            if method_filter == 'all' or method == method_filter:
+                effect = amt
+        elif cat == 'expense':
+            if method_filter == 'all' or method == method_filter:
+                effect = -amt
+        elif cat == 'bank_deposit':
+            if method_filter == 'all':
+                effect = 0
+            elif method_filter == 'cash':
+                effect = -amt
+            elif method_filter == 'bank':
+                effect = amt
+        elif cat == 'bank_withdrawal':
+            if method_filter == 'all':
+                effect = 0
+            elif method_filter == 'cash':
+                effect = amt
+            elif method_filter == 'bank':
+                effect = -amt
+                
+        tx_date = tx['transaction_date'][:10]
+        
+        if tx_date < start_date:
+            beginning_balance += effect
+        elif start_date <= tx_date <= end_date:
+            if method_filter == 'all' or method == method_filter or cat in ['bank_deposit', 'bank_withdrawal']:
+                period_transactions.append(tx)
+                
+    current_running = beginning_balance
+    report_txs = []
+    
+    for tx in period_transactions:
+        cat = tx['category']
+        method = tx['payment_method']
+        amt = float(tx['amount'])
+        
+        effect = 0
+        if cat == 'income':
+            if method_filter == 'all' or method == method_filter:
+                effect = amt
+                total_income += amt
+        elif cat == 'expense':
+            if method_filter == 'all' or method == method_filter:
+                effect = -amt
+                total_expense += amt
+        elif cat == 'bank_deposit':
+            if method_filter == 'all':
+                effect = 0
+            elif method_filter == 'cash':
+                effect = -amt
+                total_expense += amt
+            elif method_filter == 'bank':
+                effect = amt
+                total_income += amt
+        elif cat == 'bank_withdrawal':
+            if method_filter == 'all':
+                effect = 0
+            elif method_filter == 'cash':
+                effect = amt
+                total_income += amt
+            elif method_filter == 'bank':
+                effect = -amt
+                total_expense += amt
+                
+        current_running += effect
+        tx['running_balance'] = current_running
+        report_txs.append(tx)
+
+    try:
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        start_thai = start_dt.strftime('%d/%m/%Y')
+        end_thai = end_dt.strftime('%d/%m/%Y')
+    except Exception:
+        start_thai = start_date
+        end_thai = end_date
+
+    try:
+        config = client.table('system_settings').select('*').single().execute().data
+    except Exception:
+        config = None
+
+    return render_template('admin/ledger_report_print.html',
+                           transactions=report_txs,
+                           start_date=start_thai,
+                           end_date=end_thai,
+                           method_filter=method_filter,
+                           beginning_balance=beginning_balance,
+                           ending_balance=current_running,
+                           total_income=total_income,
+                           total_expense=total_expense,
+                           config=config,
+                           today=datetime.now())
+
 # --- Driver Routes ---
 
 @app.route('/driver')

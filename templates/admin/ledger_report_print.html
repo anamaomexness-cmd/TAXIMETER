@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>รายงานบัญชีแยกประเภท - TAXIMETER</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #1a365d;
+            --text: #2d3748;
+            --border: #cbd5e0;
+        }
+        body {
+            font-family: 'Sarabun', sans-serif;
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            font-size: 13px;
+            line-height: 1.5;
+            background-color: #fff;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .company-info h1 {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--primary);
+            margin: 0 0 5px 0;
+        }
+        .company-info p {
+            margin: 2px 0;
+            color: #4a5568;
+        }
+        .report-title {
+            text-align: right;
+        }
+        .report-title h2 {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0 0 5px 0;
+            color: var(--primary);
+        }
+        .report-title p {
+            margin: 2px 0;
+            font-weight: 500;
+        }
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+            background-color: #f7fafc;
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .meta-card {
+            display: flex;
+            flex-direction: column;
+        }
+        .meta-card .label {
+            font-weight: 600;
+            color: #718096;
+            margin-bottom: 4px;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        .meta-card .value {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+        th {
+            background-color: var(--primary);
+            color: white;
+            font-weight: 600;
+            text-align: left;
+            padding: 10px 8px;
+            font-size: 12px;
+            border: 1px solid var(--primary);
+        }
+        td {
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+            border-left: 1px solid #e2e8f0;
+            border-right: 1px solid #e2e8f0;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .font-bold {
+            font-weight: 700;
+        }
+        .beginning-row {
+            background-color: #edf2f7;
+            font-weight: 600;
+        }
+        .ending-row {
+            background-color: #ebf8ff;
+            font-weight: 700;
+        }
+        .income-text {
+            color: #2f855a;
+        }
+        .expense-text {
+            color: #c53030;
+        }
+        .footer {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .signature-box {
+            width: 200px;
+            text-align: center;
+        }
+        .signature-line {
+            border-bottom: 1px dashed var(--text);
+            margin-bottom: 8px;
+            height: 40px;
+        }
+        .print-btn-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .btn:hover {
+            background-color: #2b6cb0;
+        }
+        @media print {
+            .print-btn-container {
+                display: none;
+            }
+            body {
+                padding: 0;
+            }
+            @page {
+                size: A4;
+                margin: 1.5cm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-btn-container">
+        <button class="btn" onclick="window.print()"><i class="fa fa-print"></i> สั่งพิมพ์รายงาน (A4)</button>
+    </div>
+
+    <div class="header">
+        <div class="company-info">
+            {% if config %}
+            <h1>{{ config.lessor_name }}</h1>
+            <p><i class="fa fa-map-marker-alt"></i> {{ config.lessor_address }}</p>
+            <p><i class="fa fa-id-card"></i> เลขประจำตัวผู้เสียภาษี: {{ config.lessor_id }}</p>
+            {% else %}
+            <h1>TAXIMETER Co., Ltd.</h1>
+            <p><i class="fa fa-map-marker-alt"></i> สำนักงานใหญ่ บริหารจัดการค่าเช่าและบัญชีรถยนต์</p>
+            {% endif %}
+        </div>
+        <div class="report-title">
+            <h2>รายงานบัญชีแยกประเภท</h2>
+            <p>ช่วงวันที่: {{ start_date }} ถึง {{ end_date }}</p>
+            <p>บัญชี: {% if method_filter == 'all' %}เงินสด & ธนาคารทั้งหมด{% elif method_filter == 'cash' %}เฉพาะเงินสดในมือ (Cash Hand){% else %}เฉพาะบัญชีธนาคาร (Bank Balance){% endif %}</p>
+        </div>
+    </div>
+
+    <div class="meta-grid">
+        <div class="meta-card">
+            <span class="label">ยอดยกมา (Beginning Balance)</span>
+            <span class="value">฿{{ "{:,.2f}".format(beginning_balance) }}</span>
+        </div>
+        <div class="meta-card">
+            <span class="label">รายรับระหว่างงวด (Period Receipts)</span>
+            <span class="value" style="color: #2f855a;">฿{{ "{:,.2f}".format(total_income) }}</span>
+        </div>
+        <div class="meta-card">
+            <span class="label">รายจ่ายระหว่างงวด (Period Expenses)</span>
+            <span class="value" style="color: #c53030;">฿{{ "{:,.2f}".format(total_expense) }}</span>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 12%;" class="text-center">วัน-เวลาบันทึก</th>
+                <th style="width: 15%;">ประเภทธุรกรรม</th>
+                <th style="width: 15%;">ช่องทาง</th>
+                <th>คำอธิบายรายการ</th>
+                <th style="width: 15%; text-align: right;">จำนวนเงิน</th>
+                <th style="width: 15%; text-align: right;">ยอดคงเหลือสะสม</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Beginning Balance row -->
+            <tr class="beginning-row">
+                <td class="text-center">-</td>
+                <td colspan="3">ยอดยกมาสะสม ณ วันที่ {{ start_date }} (Beginning Balance Carried Forward)</td>
+                <td class="text-right">-</td>
+                <td class="text-right">฿{{ "{:,.2f}".format(beginning_balance) }}</td>
+            </tr>
+
+            {% for tx in transactions %}
+            <tr>
+                <td class="text-center">{{ tx.transaction_date[:10] }}</td>
+                <td>
+                    {% if tx.category == 'income' %}
+                    <span class="income-text"><i class="fa fa-plus-circle"></i> รายรับ</span>
+                    {% elif tx.category == 'expense' %}
+                    <span class="expense-text"><i class="fa fa-minus-circle"></i> รายจ่าย</span>
+                    {% elif tx.category == 'bank_deposit' %}
+                    <span><i class="fa fa-arrow-right"></i> นำฝากธนาคาร</span>
+                    {% elif tx.category == 'bank_withdrawal' %}
+                    <span><i class="fa fa-arrow-left"></i> ถอนเงินสด</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if tx.payment_method == 'cash' %}
+                    <span>เงินสด</span>
+                    {% else %}
+                    <span>ธนาคาร</span>
+                    {% endif %}
+                </td>
+                <td>{{ tx.description }}</td>
+                <td class="text-right font-bold {% if tx.category == 'income' %}income-text{% elif tx.category == 'expense' %}expense-text{% endif %}">
+                    {% if tx.category == 'income' %}+{% elif tx.category == 'expense' %}-{% endif %}฿{{ "{:,.2f}".format(tx.amount) }}
+                </td>
+                <td class="text-right font-bold">฿{{ "{:,.2f}".format(tx.running_balance) }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="text-center" style="padding: 20px; color: #718096;">
+                    ไม่มีรายการธุรกรรมในระหว่างงวดเวลานี้
+                </td>
+            </tr>
+            {% endfor %}
+
+            <!-- Ending Balance row -->
+            <tr class="ending-row">
+                <td class="text-center">-</td>
+                <td colspan="3">ยอดยกไปสะสม ณ วันที่ {{ end_date }} (Ending Balance Carried Over)</td>
+                <td class="text-right">-</td>
+                <td class="text-right">฿{{ "{:,.2f}".format(ending_balance) }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <div style="font-size: 11px; color: #718096;">
+            พิมพ์รายงาน ณ วันที่ {{ today.strftime('%d/%m/%Y %H:%M') }} น. | ระบบบัญชี TAXIMETER
+        </div>
+        <div style="display: flex; gap: 30px;">
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div>ผู้จัดทำ / เจ้าหน้าที่บัญชี</div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <div>ผู้อนุมัติรายงาน</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

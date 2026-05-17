@@ -14,6 +14,9 @@
         <button class="btn" onclick="showModal('transferModal')" style="background: #2a5298; color: white; display: flex; align-items: center; gap: 8px; border: none; box-shadow: 0 4px 15px rgba(42, 82, 152, 0.2);">
             <i class="fa fa-exchange-alt"></i> ฝาก/ถอนเงิน
         </button>
+        <button class="btn" onclick="showModal('printReportModal')" style="background: #0f766e; color: white; display: flex; align-items: center; gap: 8px; border: none; box-shadow: 0 4px 15px rgba(15, 118, 110, 0.2);">
+            <i class="fa fa-print"></i> พิมพ์รายงาน
+        </button>
     </div>
 </div>
 
@@ -310,6 +313,42 @@
             <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
                 <button type="button" class="btn" onclick="hideModal('transferModal')" style="background: #edf2f7; color: var(--text);">ยกเลิก</button>
                 <button type="submit" class="btn btn-primary" style="background: #2a5298;">ตกลงดำเนินรายการ</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Print Report Modal -->
+<div id="printReportModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 500px; margin: 1rem; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border-radius: var(--radius); border: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2 style="font-weight: 800; margin: 0; font-size: 1.5rem;">พิมพ์รายงานบัญชีแยกประเภท</h2>
+            <i class="fa fa-times" style="cursor: pointer; font-size: 1.2rem; color: var(--text-muted);" onclick="hideModal('printReportModal')"></i>
+        </div>
+        
+        <form action="{{ url_for('print_ledger_report') }}" method="GET" target="_blank" onsubmit="hideModal('printReportModal')">
+            <div class="form-group">
+                <label>จากวันที่ (Start Date)</label>
+                <input type="date" name="start_date" class="form-control" value="{{ today_str[:8] }}01" required>
+            </div>
+            
+            <div class="form-group" style="margin-top: 1rem;">
+                <label>ถึงวันที่ (End Date)</label>
+                <input type="date" name="end_date" class="form-control" value="{{ today_str }}" required>
+            </div>
+            
+            <div class="form-group" style="margin-top: 1rem;">
+                <label>เลือกประเภทบัญชี</label>
+                <select name="method" class="form-control" style="border-radius: 10px; cursor: pointer; padding: 0.5rem 1rem;">
+                    <option value="all">เงินสด & บัญชีธนาคารทั้งหมด</option>
+                    <option value="cash">เฉพาะเงินสดในมือ (Cash Hand)</option>
+                    <option value="bank">เฉพาะเงินฝากบัญชีธนาคาร (Bank Balance)</option>
+                </select>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2.5rem;">
+                <button type="button" class="btn" onclick="hideModal('printReportModal')" style="background: #edf2f7; color: var(--text);">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary" style="background: #0f766e; border: none;">เปิดหน้าพิมพ์รายงาน</button>
             </div>
         </form>
     </div>
