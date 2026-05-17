@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Header Section -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1 style="font-weight: 800; margin: 0;">บัญชีเงินสด & บัญชีธนาคาร</h1>
+        <p style="color: var(--text-muted); margin: 0.2rem 0 0 0;">จัดการบัญชีแยกประเภท รายรับ-รายจ่าย เงินสดในมือ และเงินฝากธนาคาร</p>
+    </div>
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <button class="btn btn-primary" onclick="showModal('addManualModal')" style="display: flex; align-items: center; gap: 8px;">
+            <i class="fa fa-plus-circle"></i> บันทึก รับ/จ่าย
+        </button>
+        <button class="btn" onclick="showModal('transferModal')" style="background: #2a5298; color: white; display: flex; align-items: center; gap: 8px; border: none; box-shadow: 0 4px 15px rgba(42, 82, 152, 0.2);">
+            <i class="fa fa-exchange-alt"></i> ฝาก/ถอนเงิน
+        </button>
+    </div>
+</div>
+
+<!-- Financial Summary Cards -->
+<div class="stat-grid" style="margin-bottom: 2.5rem;">
+    <!-- Cash Balance Card -->
+    <div class="stat-card" style="background: linear-gradient(135deg, var(--primary-light), var(--primary)); color: white; border: none; position: relative; overflow: hidden; padding: 2rem;">
+        <div style="position: absolute; right: -10px; bottom: -20px; font-size: 8rem; opacity: 0.15; color: white;">
+            <i class="fa fa-wallet"></i>
+        </div>
+        <div>
+            <p style="color: rgba(255,255,255,0.85); font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">เงินสดคงเหลือ (Cash Hand)</p>
+            <h3 style="font-size: 2.2rem; font-weight: 800; margin: 0;">฿{{ "{:,.2f}".format(cash_balance) }}</h3>
+        </div>
+        <div class="icon" style="color: white; opacity: 1;">
+            <i class="fa fa-wallet" style="font-size: 2.5rem;"></i>
+        </div>
+    </div>
+
+    <!-- Bank Balance Card -->
+    <div class="stat-card" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; border: none; position: relative; overflow: hidden; padding: 2rem;">
+        <div style="position: absolute; right: -10px; bottom: -20px; font-size: 8rem; opacity: 0.15; color: white;">
+            <i class="fa fa-university"></i>
+        </div>
+        <div>
+            <p style="color: rgba(255,255,255,0.85); font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">เงินฝากธนาคาร (Bank Balance)</p>
+            <h3 style="font-size: 2.2rem; font-weight: 800; margin: 0;">฿{{ "{:,.2f}".format(bank_balance) }}</h3>
+        </div>
+        <div class="icon" style="color: white; opacity: 1;">
+            <i class="fa fa-university" style="font-size: 2.5rem;"></i>
+        </div>
+    </div>
+
+    <!-- Total Net Worth Card -->
+    <div class="stat-card" style="background: white; border: 1px solid rgba(0,0,0,0.06); position: relative; overflow: hidden; padding: 2rem;">
+        <div style="position: absolute; right: -10px; bottom: -20px; font-size: 8rem; opacity: 0.05; color: var(--dark);">
+            <i class="fa fa-chart-pie"></i>
+        </div>
+        <div>
+            <p style="color: var(--text-muted); font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">รวมสินทรัพย์การเงินทั้งหมด</p>
+            <h3 style="font-size: 2.2rem; font-weight: 800; margin: 0; color: #27ae60;">฿{{ "{:,.2f}".format(cash_balance + bank_balance) }}</h3>
+        </div>
+        <div class="icon" style="color: #27ae60; opacity: 0.2;">
+            <i class="fa fa-chart-pie" style="font-size: 2.5rem;"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Filters and Actions Bar -->
+<div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+        <!-- Search bar -->
+        <div style="position: relative; flex: 1; min-width: 250px; max-width: 400px;">
+            <i class="fa fa-search" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+            <input type="text" id="ledgerSearch" class="form-control" placeholder="ค้นหาบันทึกการทำธุรกรรม..." style="padding-left: 40px; border-radius: 10px;">
+        </div>
+        
+        <!-- Filters -->
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <select id="filterCategory" class="form-control" style="width: auto; border-radius: 10px; cursor: pointer; padding: 0.5rem 2rem 0.5rem 1rem;">
+                <option value="">-- ประเภททั้งหมด --</option>
+                <option value="income">รายรับ (+)</option>
+                <option value="expense">รายจ่าย (-)</option>
+                <option value="bank_deposit">นำฝากธนาคาร</option>
+                <option value="bank_withdrawal">ถอนเงินสด</option>
+            </select>
+            
+            <select id="filterMethod" class="form-control" style="width: auto; border-radius: 10px; cursor: pointer; padding: 0.5rem 2rem 0.5rem 1rem;">
+                <option value="">-- ช่องทางทั้งหมด --</option>
+                <option value="cash">เงินสด</option>
+                <option value="bank">ธนาคาร</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Ledger Transactions Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="padding: 1.2rem 1rem;">วัน-เวลาบันทึก</th>
+                    <th>ประเภท</th>
+                    <th>ช่องทางการเงิน</th>
+                    <th>คำอธิบาย</th>
+                    <th style="text-align: right;">จำนวนเงิน</th>
+                    <th>แหล่งที่มา</th>
+                    <th style="text-align: center;">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tx in transactions %}
+                <tr class="ledger-row" data-category="{{ tx.category }}" data-method="{{ tx.payment_method }}" data-desc="{{ tx.description | lower }}">
+                    <!-- Date -->
+                    <td style="padding: 1.2rem 1rem; font-weight: 500; color: var(--text-muted);">
+                        {{ tx.transaction_date[:10] }}
+                        <span style="font-size: 0.8rem; display: block; opacity: 0.7;">
+                            {{ tx.transaction_date[11:16] if len(tx.transaction_date) > 16 else '' }}
+                        </span>
+                    </td>
+                    
+                    <!-- Category Badge -->
+                    <td>
+                        {% if tx.category == 'income' %}
+                        <span style="background: #e6fffa; color: #047857; padding: 0.4rem 0.8rem; border-radius: 50px; font-size: 0.8rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+                            <i class="fa fa-plus-circle"></i> รายรับ
+                        </span>
+                        {% elif tx.category == 'expense' %}
+                        <span style="background: #fff5f5; color: #c53030; padding: 0.4rem 0.8rem; border-radius: 50px; font-size: 0.8rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+                            <i class="fa fa-minus-circle"></i> รายจ่าย
+                        </span>
+                        {% elif tx.category == 'bank_deposit' %}
+                        <span style="background: #ebf8ff; color: #2b6cb0; padding: 0.4rem 0.8rem; border-radius: 50px; font-size: 0.8rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+                            <i class="fa fa-arrow-right"></i> ฝากเข้าธนาคาร
+                        </span>
+                        {% elif tx.category == 'bank_withdrawal' %}
+                        <span style="background: #fffaf0; color: #dd6b20; padding: 0.4rem 0.8rem; border-radius: 50px; font-size: 0.8rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+                            <i class="fa fa-arrow-left"></i> ถอนเงินสด
+                        </span>
+                        {% endif %}
+                    </td>
+                    
+                    <!-- Payment Method -->
+                    <td>
+                        {% if tx.payment_method == 'cash' %}
+                        <span style="color: #4a5568; font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 6px;">
+                            <i class="fa fa-money-bill-wave" style="color: #48bb78;"></i> เงินสด
+                        </span>
+                        {% else %}
+                        <span style="color: #4a5568; font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 6px;">
+                            <i class="fa fa-university" style="color: #3182ce;"></i> บัญชีธนาคาร
+                        </span>
+                        {% endif %}
+                    </td>
+                    
+                    <!-- Description -->
+                    <td style="font-weight: 500; font-size: 0.95rem; max-width: 320px; white-space: normal; word-break: break-all;">
+                        {{ tx.description }}
+                    </td>
+                    
+                    <!-- Amount -->
+                    <td style="text-align: right; font-weight: 700; font-size: 1.1rem;
+                               {% if tx.category == 'income' %}color: #27ae60;
+                               {% elif tx.category == 'expense' %}color: #ee4d2d;
+                               {% else %}color: var(--text);{% endif %}">
+                        {% if tx.category == 'income' %}+{% elif tx.category == 'expense' %}-{% endif %}฿{{ "{:,.2f}".format(tx.amount) }}
+                    </td>
+                    
+                    <!-- Reference Source indicator -->
+                    <td>
+                        {% if tx.reference_payment_id %}
+                        <span style="background: #e6fffa; border: 1px solid #b2f5ea; color: #0f766e; padding: 0.2rem 0.5rem; border-radius: 5px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fa fa-file-invoice-dollar"></i> บิลค่าเช่า
+                        </span>
+                        {% elif tx.reference_repair_id %}
+                        <span style="background: #fffaf0; border: 1px solid #fbd38d; color: #c05621; padding: 0.2rem 0.5rem; border-radius: 5px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fa fa-tools"></i> บิลค่าซ่อม
+                        </span>
+                        {% else %}
+                        <span style="background: #edf2f7; border: 1px solid #e2e8f0; color: #4a5568; padding: 0.2rem 0.5rem; border-radius: 5px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="fa fa-user"></i> บันทึกเอง
+                        </span>
+                        {% endif %}
+                    </td>
+                    
+                    <!-- Actions -->
+                    <td style="text-align: center;">
+                        {% if not tx.reference_payment_id and not tx.reference_repair_id %}
+                        <button class="btn" style="padding: 0.4rem 0.6rem; background: #fff5f5; color: var(--danger); border-radius: 6px; border: none; cursor: pointer; transition: 0.2s;" onclick="confirmDelete('{{ tx.id }}', '{{ tx.description }}', '{{ tx.amount }}')">
+                            <i class="fa fa-trash-alt"></i>
+                        </button>
+                        {% else %}
+                        <span style="font-size: 0.8rem; color: var(--text-muted); opacity: 0.5; font-style: italic;">ล็อคออโต้</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 4rem; color: var(--text-muted);">
+                        <i class="fa fa-folder-open" style="font-size: 3rem; display: block; margin-bottom: 1rem; opacity: 0.3;"></i>
+                        ไม่พบรายการบัญชีในระบบ
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ================= MODALS ================= -->
+
+<!-- Add Manual Income/Expense Modal -->
+<div id="addManualModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 500px; margin: 1rem; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border-radius: var(--radius); border: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2 style="font-weight: 800; margin: 0; font-size: 1.5rem;">บันทึก รายรับ/รายจ่าย มือ</h2>
+            <i class="fa fa-times" style="cursor: pointer; font-size: 1.2rem; color: var(--text-muted);" onclick="hideModal('addManualModal')"></i>
+        </div>
+        
+        <form action="{{ url_for('manage_ledger') }}" method="POST">
+            <input type="hidden" name="action" value="add_manual">
+            
+            <div class="form-group">
+                <label>ประเภทรายการ</label>
+                <div style="display: flex; gap: 1rem; margin-top: 5px;">
+                    <label style="flex: 1; border: 1.5px solid #edf2f7; border-radius: 8px; padding: 0.8rem; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;" class="radio-label">
+                        <input type="radio" name="category" value="income" checked style="accent-color: var(--success);">
+                        <span style="color: #27ae60;"><i class="fa fa-plus-circle"></i> รายรับ</span>
+                    </label>
+                    <label style="flex: 1; border: 1.5px solid #edf2f7; border-radius: 8px; padding: 0.8rem; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;" class="radio-label">
+                        <input type="radio" name="category" value="expense" style="accent-color: var(--danger);">
+                        <span style="color: #ee4d2d;"><i class="fa fa-minus-circle"></i> รายจ่าย</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>ช่องทางการเงิน</label>
+                <div style="display: flex; gap: 1rem; margin-top: 5px;">
+                    <label style="flex: 1; border: 1.5px solid #edf2f7; border-radius: 8px; padding: 0.8rem; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;" class="radio-label">
+                        <input type="radio" name="payment_method" value="cash" checked style="accent-color: #48bb78;">
+                        <span><i class="fa fa-money-bill-wave" style="color: #48bb78;"></i> เงินสด</span>
+                    </label>
+                    <label style="flex: 1; border: 1.5px solid #edf2f7; border-radius: 8px; padding: 0.8rem; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;" class="radio-label">
+                        <input type="radio" name="payment_method" value="bank" style="accent-color: #3182ce;">
+                        <span><i class="fa fa-university" style="color: #3182ce;"></i> โอนผ่านธนาคาร</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>จำนวนเงิน (บาท)</label>
+                <input type="number" step="0.01" name="amount" class="form-control" placeholder="0.00" required style="font-weight: 700; font-size: 1.1rem; padding: 0.8rem;">
+            </div>
+            
+            <div class="form-group">
+                <label>คำอธิบายรายการ</label>
+                <input type="text" name="description" class="form-control" placeholder="เช่น ขายแบตเตอรี่เก่า, ค่าไฟออฟฟิศ" required>
+            </div>
+            
+            <div class="form-group">
+                <label>วันที่ทำรายการ</label>
+                <input type="date" name="transaction_date" class="form-control" value="{{ today_str }}" required>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn" onclick="hideModal('addManualModal')" style="background: #edf2f7; color: var(--text);">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary">บันทึกข้อมูล</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Bank Transfer / Deposit & Withdrawal Modal -->
+<div id="transferModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 500px; margin: 1rem; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border-radius: var(--radius); border: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2 style="font-weight: 800; margin: 0; font-size: 1.5rem;">ทำรายการ นำฝาก / ถอนเงินธนาคาร</h2>
+            <i class="fa fa-times" style="cursor: pointer; font-size: 1.2rem; color: var(--text-muted);" onclick="hideModal('transferModal')"></i>
+        </div>
+        
+        <form action="{{ url_for('manage_ledger') }}" method="POST">
+            <input type="hidden" name="action" value="transfer">
+            
+            <div class="form-group">
+                <label>ประเภทธุรกรรม</label>
+                <div style="display: flex; gap: 1rem; margin-top: 5px;">
+                    <label style="flex: 1; border: 1.5px solid #edf2f7; border-radius: 8px; padding: 0.8rem; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;" class="radio-label">
+                        <input type="radio" name="transfer_type" value="deposit" checked style="accent-color: #2b6cb0;">
+                        <span style="color: #2b6cb0;"><i class="fa fa-arrow-right"></i> นำฝากธนาคาร</span>
+                    </label>
+                    <label style="flex: 1; border: 1.5px solid #edf2f7; border-radius: 8px; padding: 0.8rem; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;" class="radio-label">
+                        <input type="radio" name="transfer_type" value="withdrawal" style="accent-color: #dd6b20;">
+                        <span style="color: #dd6b20;"><i class="fa fa-arrow-left"></i> ถอนเงินสดออก</span>
+                    </label>
+                </div>
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; line-height: 1.4;">
+                    * <strong>นำฝากธนาคาร:</strong> จะลดเงินสดในมือ และเพิ่มเงินฝากในธนาคาร<br>
+                    * <strong>ถอนเงินสดออก:</strong> จะเพิ่มเงินสดในมือ และลดเงินฝากในธนาคาร
+                </p>
+            </div>
+            
+            <div class="form-group">
+                <label>จำนวนเงินนำฝาก / ถอน (บาท)</label>
+                <input type="number" step="0.01" name="amount" class="form-control" placeholder="0.00" required style="font-weight: 700; font-size: 1.1rem; padding: 0.8rem;">
+            </div>
+            
+            <div class="form-group">
+                <label>วันที่ทำธุรกรรม</label>
+                <input type="date" name="transaction_date" class="form-control" value="{{ today_str }}" required>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn" onclick="hideModal('transferModal')" style="background: #edf2f7; color: var(--text);">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary" style="background: #2a5298;">ตกลงดำเนินรายการ</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Hidden Delete Form -->
+<form id="deleteLedgerForm" method="POST" style="display: none;"></form>
+
+<script>
+    function showModal(id) {
+        document.getElementById(id).style.display = 'flex';
+    }
+    
+    function hideModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+    
+    function confirmDelete(txId, desc, amount) {
+        const formattedAmt = parseFloat(amount).toLocaleString('th-TH', { minimumFractionDigits: 2 });
+        if (confirm(`คุณต้องการลบรายการ "${desc}" จำนวน ฿${formattedAmt} ใช่หรือไม่?`)) {
+            const form = document.getElementById('deleteLedgerForm');
+            form.action = `/admin/ledger/delete/${txId}`;
+            form.submit();
+        }
+    }
+
+    // Dynamic Filtering and Searching Client Side
+    const searchInput = document.getElementById('ledgerSearch');
+    const filterCat = document.getElementById('filterCategory');
+    const filterMeth = document.getElementById('filterMethod');
+    const rows = document.querySelectorAll('.ledger-row');
+
+    function filterTable() {
+        const query = searchInput.value.toLowerCase();
+        const catVal = filterCat.value;
+        const methVal = filterMeth.value;
+
+        rows.forEach(row => {
+            const desc = row.getAttribute('data-desc');
+            const cat = row.getAttribute('data-category');
+            const method = row.getAttribute('data-method');
+
+            const matchSearch = desc.includes(query);
+            const matchCat = catVal === "" || cat === catVal;
+            const matchMethod = methVal === "" || method === methVal;
+
+            if (matchSearch && matchCat && matchMethod) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    searchInput.addEventListener('keyup', filterTable);
+    filterCat.addEventListener('change', filterTable);
+    filterMeth.addEventListener('change', filterTable);
+</script>
+{% endblock %}

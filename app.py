@@ -451,12 +451,31 @@ def manage_payments():
         receipt_no = f"REC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
         try:
-            client.table('payments').insert({
+            res_insert = client.table('payments').insert({
                 "contract_id": contract_id,
                 "amount": amount,
                 "payment_type": p_type,
                 "notes": notes,
                 "receipt_no": receipt_no
+            }).execute()
+            
+            payment_id = res_insert.data[0]['id']
+            
+            # Fetch details for description
+            contract_details = client.table('contracts').select('*, drivers(first_name, last_name), cars(license_plate)').eq('id', contract_id).single().execute().data
+            driver_name = f"{contract_details['drivers']['first_name']} {contract_details['drivers']['last_name']}"
+            plate = contract_details['cars']['license_plate']
+            
+            type_label = 'ค่าเช่า' if p_type == 'rent' else 'ผ่อนหนี้' if p_type == 'debt' else 'เงินค้ำ' if p_type == 'deposit' else 'ค่าปรับ'
+            desc = f"รายรับออโต้ ({type_label}): {driver_name} ทะเบียน {plate} บิล {receipt_no}"
+            
+            # Auto-sync to Ledger
+            client.table('ledger_transactions').insert({
+                "category": "income",
+                "payment_method": "cash",
+                "amount": amount,
+                "description": desc,
+                "reference_payment_id": payment_id
             }).execute()
             
             # If it's a deposit, update driver's balance
@@ -488,13 +507,29 @@ def manage_repairs():
         r_date = request.form.get('repair_date')
         
         try:
-            client.table('repairs').insert({
+            res_insert = client.table('repairs').insert({
                 "car_id": car_id,
                 "repair_type": r_type,
                 "description": desc,
                 "cost": cost,
                 "repair_date": r_date
             }).execute()
+            
+            repair_id = res_insert.data[0]['id']
+            
+            # Fetch car details
+            car_details = client.table('cars').select('license_plate').eq('id', car_id).single().execute().data
+            plate = car_details['license_plate']
+            
+            # Auto-sync to Ledger
+            client.table('ledger_transactions').insert({
+                "category": "expense",
+                "payment_method": "cash",
+                "amount": cost,
+                "description": f"ค่าใช้จ่ายออโต้ (ค่าซ่อมบำรุง): ทะเบียน {plate} - {desc}",
+                "reference_repair_id": repair_id
+            }).execute()
+            
             flash("บันทึกรายการซ่อมเรียบร้อยแล้ว", "success")
         except Exception as e:
             flash(f"เกิดข้อผิดพลาด: {str(e)}", "danger")
@@ -522,6 +557,18 @@ def edit_repair(repair_id):
             "cost": cost,
             "repair_date": r_date
         }).eq('id', repair_id).execute()
+        
+        # Fetch car details
+        car_details = client.table('cars').select('license_plate').eq('id', car_id).single().execute().data
+        plate = car_details['license_plate']
+        
+        # Update ledger transaction
+        client.table('ledger_transactions').update({
+            "amount": cost,
+            "description": f"ค่าใช้จ่ายออโต้ (ค่าซ่อมบำรุง): ทะเบียน {plate} - {desc}",
+            "transaction_date": r_date
+        }).eq('reference_repair_id', repair_id).execute()
+        
         flash("อัปเดตรายการซ่อมเรียบร้อยแล้ว", "success")
     except Exception as e:
         flash(f"เกิดข้อผิดพลาดในการอัปเดต: {str(e)}", "danger")
@@ -532,6 +579,9 @@ def edit_repair(repair_id):
 def delete_repair(repair_id):
     try:
         client = supabase_admin if supabase_admin else supabase
+        # Delete from ledger first
+        client.table('ledger_transactions').delete().eq('reference_repair_id', repair_id).execute()
+        # Delete from repairs
         client.table('repairs').delete().eq('id', repair_id).execute()
         flash("ลบรายการซ่อมเรียบร้อยแล้ว", "success")
     except Exception as e:
@@ -1037,6 +1087,97 @@ def print_payment_history():
     except Exception as e:
         flash(f"เกิดข้อผิดพลาด: {str(e)}", "danger")
         return redirect(url_for('manage_payment_history'))
+
+# --- Ledger (Accounting) Routes ---
+
+@app.route('/admin/ledger', methods=['GET', 'POST'])
+@admin_required
+def manage_ledger():
+    client = supabase_admin if supabase_admin else supabase
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'add_manual':
+            category = request.form.get('category')  # 'income' or 'expense'
+            method = request.form.get('payment_method')  # 'cash' or 'bank'
+            amount = float(request.form.get('amount', 0))
+            desc = request.form.get('description')
+            t_date = request.form.get('transaction_date', date.today().isoformat())
+            try:
+                client.table('ledger_transactions').insert({
+                    "category": category,
+                    "payment_method": method,
+                    "amount": amount,
+                    "description": desc,
+                    "transaction_date": t_date
+                }).execute()
+                flash("บันทึกรายการบัญชีสำเร็จ", "success")
+            except Exception as e:
+                flash(f"เกิดข้อผิดพลาด: {str(e)}", "danger")
+        elif action == 'transfer':
+            transfer_type = request.form.get('transfer_type')  # 'deposit' or 'withdrawal'
+            amount = float(request.form.get('amount', 0))
+            t_date = request.form.get('transaction_date', date.today().isoformat())
+            desc = "นำฝากเงินสดเข้าบัญชีธนาคาร" if transfer_type == 'deposit' else "ถอนเงินสดจากธนาคารมาถือเงินสด"
+            try:
+                client.table('ledger_transactions').insert({
+                    "category": f"bank_{transfer_type}",
+                    "payment_method": "cash",
+                    "amount": amount,
+                    "description": desc,
+                    "transaction_date": t_date
+                }).execute()
+                flash(f"บันทึกรายการ {desc} สำเร็จ", "success")
+            except Exception as e:
+                flash(f"เกิดข้อผิดพลาด: {str(e)}", "danger")
+        return redirect(url_for('manage_ledger'))
+
+    try:
+        txs = client.table('ledger_transactions').select('*').order('transaction_date', desc=True).order('created_at', desc=True).execute().data
+    except Exception as e:
+        print(f"Error fetching ledger transactions: {e}")
+        txs = []
+
+    # Calculate balances
+    cash_balance = 0
+    bank_balance = 0
+    for tx in txs:
+        cat = tx['category']
+        method = tx['payment_method']
+        amt = float(tx['amount'])
+
+        if cat == 'income':
+            if method == 'cash':
+                cash_balance += amt
+            elif method == 'bank':
+                bank_balance += amt
+        elif cat == 'expense':
+            if method == 'cash':
+                cash_balance -= amt
+            elif method == 'bank':
+                bank_balance -= amt
+        elif cat == 'bank_deposit':
+            cash_balance -= amt
+            bank_balance += amt
+        elif cat == 'bank_withdrawal':
+            cash_balance += amt
+            bank_balance -= amt
+
+    return render_template('admin/ledger.html', 
+                           transactions=txs, 
+                           cash_balance=cash_balance, 
+                           bank_balance=bank_balance,
+                           today_str=date.today().isoformat())
+
+@app.route('/admin/ledger/delete/<tx_id>', methods=['POST'])
+@admin_required
+def delete_ledger_transaction(tx_id):
+    client = supabase_admin if supabase_admin else supabase
+    try:
+        client.table('ledger_transactions').delete().eq('id', tx_id).execute()
+        flash("ลบรายการบัญชีเรียบร้อยแล้ว", "success")
+    except Exception as e:
+        flash(f"เกิดข้อผิดพลาดในการลบ: {str(e)}", "danger")
+    return redirect(url_for('manage_ledger'))
 
 # --- Driver Routes ---
 

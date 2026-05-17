@@ -50,6 +50,9 @@
         <a href="{{ url_for('manage_reports') }}" class="sidebar-link {% if request.path == url_for('manage_reports') %}active{% endif %}">
             <i class="fa fa-chart-line"></i> &nbsp; รายงานสรุป
         </a>
+        <a href="{{ url_for('manage_ledger') }}" class="sidebar-link {% if request.path == url_for('manage_ledger') %}active{% endif %}">
+            <i class="fa fa-wallet"></i> &nbsp; บัญชีเงินสด/ธนาคาร
+        </a>
         <a href="{{ url_for('manage_settings') }}" class="sidebar-link {% if request.path == url_for('manage_settings') %}active{% endif %}">
             <i class="fa fa-cog"></i> &nbsp; ตั้งค่าระบบ
         </a>
