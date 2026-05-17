@@ -142,11 +142,44 @@ def admin_dashboard():
     payments_today = client.table('payments').select('amount').gte('payment_date', f"{today_str}T00:00:00").lte('payment_date', f"{today_str}T23:59:59").execute().data
     today_income = sum(float(p['amount']) for p in payments_today)
     
+    # Fetch ledger transactions to calculate cash and bank balances
+    try:
+        txs = client.table('ledger_transactions').select('category', 'payment_method', 'amount').execute().data
+    except Exception as e:
+        print(f"Error fetching ledger transactions on dashboard: {e}")
+        txs = []
+
+    cash_balance = 0
+    bank_balance = 0
+    for tx in txs:
+        cat = tx['category']
+        method = tx['payment_method']
+        amt = float(tx['amount'])
+
+        if cat == 'income':
+            if method == 'cash':
+                cash_balance += amt
+            elif method == 'bank':
+                bank_balance += amt
+        elif cat == 'expense':
+            if method == 'cash':
+                cash_balance -= amt
+            elif method == 'bank':
+                bank_balance -= amt
+        elif cat == 'bank_deposit':
+            cash_balance -= amt
+            bank_balance += amt
+        elif cat == 'bank_withdrawal':
+            cash_balance += amt
+            bank_balance -= amt
+            
     return render_template('admin/dashboard.html', 
                            cars_count=cars_count, 
                            drivers_count=drivers_count, 
                            active_contracts=active_contracts,
                            today_income=today_income,
+                           cash_balance=cash_balance,
+                           bank_balance=bank_balance,
                            now=datetime.now().strftime('%d %B %Y'))
 
 @app.route('/admin/cars', methods=['GET', 'POST'])

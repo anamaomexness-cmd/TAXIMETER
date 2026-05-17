@@ -40,6 +40,20 @@
         </div>
         <div class="icon"><i class="fa fa-coins"></i></div>
     </div>
+    <div class="stat-card" style="border-left: 4px solid var(--primary-light);">
+        <div>
+            <p>เงินสดคงเหลือล่าสุด</p>
+            <h3 style="color: var(--primary-light);">฿{{ "{:,.2f}".format(cash_balance) }}</h3>
+        </div>
+        <div class="icon" style="color: var(--primary-light); opacity: 0.8;"><i class="fa fa-wallet"></i></div>
+    </div>
+    <div class="stat-card" style="border-left: 4px solid #2a5298;">
+        <div>
+            <p>เงินในบัญชีธนาคาร</p>
+            <h3 style="color: #2a5298;">฿{{ "{:,.2f}".format(bank_balance) }}</h3>
+        </div>
+        <div class="icon" style="color: #2a5298; opacity: 0.8;"><i class="fa fa-university"></i></div>
+    </div>
 </div>
 
 <div class="card" style="margin-top: 2rem;">
