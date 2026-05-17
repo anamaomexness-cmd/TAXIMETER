@@ -494,22 +494,23 @@ def manage_payments():
             
             payment_id = res_insert.data[0]['id']
             
-            # Fetch details for description
-            contract_details = client.table('contracts').select('*, drivers(first_name, last_name), cars(license_plate)').eq('id', contract_id).single().execute().data
+            # Fetch details for description and car type
+            contract_details = client.table('contracts').select('*, drivers(first_name, last_name), cars(license_plate, car_type)').eq('id', contract_id).single().execute().data
             driver_name = f"{contract_details['drivers']['first_name']} {contract_details['drivers']['last_name']}"
             plate = contract_details['cars']['license_plate']
             
             type_label = 'ค่าเช่า' if p_type == 'rent' else 'ผ่อนหนี้' if p_type == 'debt' else 'เงินค้ำ' if p_type == 'deposit' else 'ค่าปรับ'
             desc = f"รายรับออโต้ ({type_label}): {driver_name} ทะเบียน {plate} บิล {receipt_no}"
             
-            # Auto-sync to Ledger
-            client.table('ledger_transactions').insert({
-                "category": "income",
-                "payment_method": "cash",
-                "amount": amount,
-                "description": desc,
-                "reference_payment_id": payment_id
-            }).execute()
+            # Auto-sync to Ledger (only if car_type is 'taxi')
+            if contract_details['cars']['car_type'] == 'taxi':
+                client.table('ledger_transactions').insert({
+                    "category": "income",
+                    "payment_method": "cash",
+                    "amount": amount,
+                    "description": desc,
+                    "reference_payment_id": payment_id
+                }).execute()
             
             # If it's a deposit, update driver's balance
             if p_type == 'deposit':
@@ -550,18 +551,19 @@ def manage_repairs():
             
             repair_id = res_insert.data[0]['id']
             
-            # Fetch car details
-            car_details = client.table('cars').select('license_plate').eq('id', car_id).single().execute().data
+            # Fetch car details and car type
+            car_details = client.table('cars').select('license_plate, car_type').eq('id', car_id).single().execute().data
             plate = car_details['license_plate']
             
-            # Auto-sync to Ledger
-            client.table('ledger_transactions').insert({
-                "category": "expense",
-                "payment_method": "cash",
-                "amount": cost,
-                "description": f"ค่าใช้จ่ายออโต้ (ค่าซ่อมบำรุง): ทะเบียน {plate} - {desc}",
-                "reference_repair_id": repair_id
-            }).execute()
+            # Auto-sync to Ledger (only if car_type is 'taxi')
+            if car_details['car_type'] == 'taxi':
+                client.table('ledger_transactions').insert({
+                    "category": "expense",
+                    "payment_method": "cash",
+                    "amount": cost,
+                    "description": f"ค่าใช้จ่ายออโต้ (ค่าซ่อมบำรุง): ทะเบียน {plate} - {desc}",
+                    "reference_repair_id": repair_id
+                }).execute()
             
             flash("บันทึกรายการซ่อมเรียบร้อยแล้ว", "success")
         except Exception as e:
@@ -591,16 +593,23 @@ def edit_repair(repair_id):
             "repair_date": r_date
         }).eq('id', repair_id).execute()
         
-        # Fetch car details
-        car_details = client.table('cars').select('license_plate').eq('id', car_id).single().execute().data
+        # Fetch car details and car type
+        car_details = client.table('cars').select('license_plate, car_type').eq('id', car_id).single().execute().data
         plate = car_details['license_plate']
         
-        # Update ledger transaction
-        client.table('ledger_transactions').update({
-            "amount": cost,
-            "description": f"ค่าใช้จ่ายออโต้ (ค่าซ่อมบำรุง): ทะเบียน {plate} - {desc}",
-            "transaction_date": r_date
-        }).eq('reference_repair_id', repair_id).execute()
+        # Always delete the old transaction first to prevent mismatch
+        client.table('ledger_transactions').delete().eq('reference_repair_id', repair_id).execute()
+        
+        # Re-insert into ledger only if the car is a 'taxi'
+        if car_details['car_type'] == 'taxi':
+            client.table('ledger_transactions').insert({
+                "category": "expense",
+                "payment_method": "cash",
+                "amount": cost,
+                "description": f"ค่าใช้จ่ายออโต้ (ค่าซ่อมบำรุง): ทะเบียน {plate} - {desc}",
+                "transaction_date": r_date,
+                "reference_repair_id": repair_id
+            }).execute()
         
         flash("อัปเดตรายการซ่อมเรียบร้อยแล้ว", "success")
     except Exception as e:
