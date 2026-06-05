@@ -128,7 +128,7 @@
             </div>
             <div class="info-item" style="text-align: right;">
                 <strong>วันที่ / Date</strong>
-                {{ payment.payment_date[:16].replace('T', ' ') }}
+                {{ payment.payment_date | bangkok_time('%Y-%m-%d %H:%M') }}
             </div>
             <div class="info-item">
                 <strong>ชื่อผู้เช่า / Driver Name</strong>

@@ -232,7 +232,7 @@
             <tbody>
                 {% for p in payments %}
                 <tr>
-                    <td>{{ p.payment_date[:16].replace('T', ' ') }}</td>
+                    <td>{{ p.payment_date | bangkok_time('%Y-%m-%d %H:%M') }}</td>
                     <td>{{ p.receipt_no }}</td>
                     <td>{{ p.contracts.cars.license_plate }}</td>
                     <td>{{ p.contracts.drivers.first_name }} {{ p.contracts.drivers.last_name }}</td>

@@ -78,7 +78,7 @@
                 {% for receipt in receipts %}
                 <tr>
                     <td style="font-weight: 700;">{{ receipt.receipt_no }}</td>
-                    <td>{{ receipt.payment_date[:10] }}</td>
+                    <td>{{ receipt.payment_date | bangkok_time('%Y-%m-%d') }}</td>
                     <td>
                         {% if receipt.payment_type == 'rent' %}ค่าเช่ารถ
                         {% elif receipt.payment_type == 'deposit' %}เงินค้ำประกัน

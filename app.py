@@ -4,6 +4,14 @@ from supabase_config import supabase, supabase_admin
 import os, json, uuid
 from functools import wraps
 
+# --- Set Timezone to Thailand ---
+os.environ['TZ'] = 'Asia/Bangkok'
+import time
+try:
+    time.tzset()  # Unix/Linux/Mac
+except AttributeError:
+    pass  # Windows doesn't support tzset()
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "taxi_meter_secret_key_123")
 
