@@ -22,7 +22,7 @@
                     <th>ทะเบียนรถ</th>
                     <th>ประเภท</th>
                     <th>รายการ</th>
-                    <th>ค่าใช้จ่าย</th>
+                    <th>รายรับ / รายจ่าย (กำไรสุทธิ)</th>
                     <th>จัดการ</th>
                 </tr>
             </thead>
@@ -33,11 +33,28 @@
                     <td style="font-weight: 700;">{{ repair.cars.license_plate }}</td>
                     <td>
                         <span style="padding: 0.2rem 0.5rem; border-radius: 5px; font-size: 0.8rem; background: {% if repair.repair_type == 'taxi' %}#fef3c7; color: #92400e;{% else %}#e2e8f0; color: #475569;{% endif %}">
-                            {{ 'แท็กซี่' if repair.repair_type == 'taxi' else 'ทั่วไป' }}
+                            {{ 'ซ่อมแท็กซี่' if repair.repair_type == 'taxi' else 'ซ่อมรถทั่วไป' }}
                         </span>
                     </td>
                     <td>{{ repair.description }}</td>
-                    <td style="color: var(--danger); font-weight: 700;">฿{{ "{:,.2f}".format(repair.cost) }}</td>
+                    <td>
+                        {% if repair.repair_type == 'general' %}
+                        <!-- แสดงกำไรและรายละเอียดสำหรับรถทั่วไป -->
+                        <div style="font-size: 0.95rem; font-weight: 700; color: var(--success);">
+                            +฿{{ "{:,.2f}".format((repair.part_selling_price or 0.0) - (repair.part_cost or 0.0) + (repair.labor_fee or 0.0)) }} (รายรับ)
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; line-height: 1.3;">
+                            <span style="white-space: nowrap;">⚙️ ต้นทุนอะไหล่: ฿{{ "{:,.2f}".format(repair.part_cost or 0) }}</span> | 
+                            <span style="white-space: nowrap;">💰 ราคาขาย: ฿{{ "{:,.2f}".format(repair.part_selling_price or 0) }}</span> | 
+                            <span style="white-space: nowrap;">🔧 ค่าแรง: ฿{{ "{:,.2f}".format(repair.labor_fee or 0) }}</span>
+                        </div>
+                        {% else %}
+                        <!-- แสดงรายจ่ายปกติสำหรับแท็กซี่ -->
+                        <div style="font-size: 0.95rem; font-weight: 700; color: var(--danger);">
+                            -฿{{ "{:,.2f}".format(repair.cost) }} (รายจ่าย)
+                        </div>
+                        {% endif %}
+                    </td>
                     <td>
                         <button class="btn" style="padding: 0.5rem; background: #edf2f7; color: var(--text);" onclick='showEditRepairModal({{ repair|tojson|safe }})'><i class="fa fa-edit"></i></button>
                         <button class="btn" style="padding: 0.5rem; background: #fff5f5; color: var(--danger);" onclick="confirmDeleteRepair('{{ repair.id }}', '{{ repair.description }}')"><i class="fa fa-trash"></i></button>
@@ -53,8 +70,9 @@
     </div>
 </div>
 
-<div id="addRepairModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
-    <div class="card" style="width: 100%; max-width: 500px; margin: 0;">
+<!-- Add Repair Modal -->
+<div id="addRepairModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; padding: 20px; overflow-y: auto;">
+    <div class="card" style="width: 100%; max-width: 500px; margin: auto;">
         <h2 style="margin-bottom: 1.5rem;">บันทึกรายการซ่อมใหม่</h2>
         <form action="{{ url_for('manage_repairs') }}" method="POST">
             <div class="form-group">
@@ -68,7 +86,7 @@
             </div>
             <div class="form-group">
                 <label>ประเภทการซ่อม</label>
-                <select name="repair_type" class="form-control">
+                <select name="repair_type" id="add_repair_type" class="form-control" onchange="toggleAddFields()">
                     <option value="taxi">ซ่อมแท็กซี่ (มิเตอร์/ป้าย/หลังคา)</option>
                     <option value="general">ซ่อมรถทั่วไป (เครื่องยนต์/ช่วงล่าง)</option>
                 </select>
@@ -77,10 +95,36 @@
                 <label>รายละเอียดการซ่อม</label>
                 <input type="text" name="description" class="form-control" placeholder="เช่น เปลี่ยนน้ำมันเครื่อง" required>
             </div>
-            <div class="form-group">
+            
+            <!-- ช่องกรอกค่าใช้จ่ายสำหรับ ซ่อมแท็กซี่ (รายจ่าย) -->
+            <div class="form-group" id="add_cost_group">
                 <label>ค่าใช้จ่าย (บาท)</label>
-                <input type="number" name="cost" class="form-control" placeholder="0.00" required>
+                <input type="number" step="0.01" name="cost" id="add_cost" class="form-control" placeholder="0.00">
             </div>
+            
+            <!-- กลุ่มช่องกรอกข้อมูลสำหรับ ซ่อมรถทั่วไป (คำนวณกำไรเป็นรายรับ) -->
+            <div id="add_general_group" style="display: none; border: 1px solid #e2e8f0; padding: 1.25rem; border-radius: 12px; margin-bottom: 1.5rem; background: #f8fafc; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+                <h4 style="margin-bottom: 1rem; font-weight: 700; color: var(--primary); font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fa fa-calculator"></i> รายละเอียดราคาซ่อมทั่วไป
+                </h4>
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">ค่าอะไหล่ต้นทุน (บาท)</label>
+                    <input type="number" step="0.01" name="part_cost" id="add_part_cost" class="form-control" placeholder="0.00" oninput="calculateAddProfit()">
+                </div>
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">ค่าอะไหล่ที่ขายได้ (บาท)</label>
+                    <input type="number" step="0.01" name="part_selling_price" id="add_part_selling_price" class="form-control" placeholder="0.00" oninput="calculateAddProfit()">
+                </div>
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">ค่าแรงช่าง (บาท)</label>
+                    <input type="number" step="0.01" name="labor_fee" id="add_labor_fee" class="form-control" placeholder="0.00" oninput="calculateAddProfit()">
+                </div>
+                <div id="add_profit_preview" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; padding: 0.75rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.9rem; margin-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(6,95,70,0.05);">
+                    <span>💵 คำนวณรายรับ (กำไรสุทธิ):</span>
+                    <span id="add_profit_text" style="font-size: 1.1rem; color: #047857;">฿0.00</span>
+                </div>
+            </div>
+            
             <div class="form-group">
                 <label>วันที่ซ่อม</label>
                 <input type="date" name="repair_date" class="form-control" value="{{ today_str }}" required>
@@ -94,8 +138,8 @@
 </div>
 
 <!-- Edit Repair Modal -->
-<div id="editRepairModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
-    <div class="card" style="width: 100%; max-width: 500px; margin: 0;">
+<div id="editRepairModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; padding: 20px; overflow-y: auto;">
+    <div class="card" style="width: 100%; max-width: 500px; margin: auto;">
         <h2 style="margin-bottom: 1.5rem;">แก้ไขรายการซ่อมบำรุง</h2>
         <form id="editRepairForm" method="POST">
             <div class="form-group">
@@ -108,7 +152,7 @@
             </div>
             <div class="form-group">
                 <label>ประเภทการซ่อม</label>
-                <select name="repair_type" id="edit_repair_type" class="form-control">
+                <select name="repair_type" id="edit_repair_type" class="form-control" onchange="toggleEditFields()">
                     <option value="taxi">ซ่อมแท็กซี่ (มิเตอร์/ป้าย/หลังคา)</option>
                     <option value="general">ซ่อมรถทั่วไป (เครื่องยนต์/ช่วงล่าง)</option>
                 </select>
@@ -117,10 +161,36 @@
                 <label>รายละเอียดการซ่อม</label>
                 <input type="text" name="description" id="edit_description" class="form-control" required>
             </div>
-            <div class="form-group">
+            
+            <!-- ช่องกรอกค่าใช้จ่ายสำหรับ ซ่อมแท็กซี่ (รายจ่าย) -->
+            <div class="form-group" id="edit_cost_group">
                 <label>ค่าใช้จ่าย (บาท)</label>
-                <input type="number" name="cost" id="edit_cost" class="form-control" required>
+                <input type="number" step="0.01" name="cost" id="edit_cost" class="form-control">
             </div>
+            
+            <!-- กลุ่มช่องกรอกข้อมูลสำหรับ ซ่อมรถทั่วไป (คำนวณกำไรเป็นรายรับ) -->
+            <div id="edit_general_group" style="display: none; border: 1px solid #e2e8f0; padding: 1.25rem; border-radius: 12px; margin-bottom: 1.5rem; background: #f8fafc; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+                <h4 style="margin-bottom: 1rem; font-weight: 700; color: var(--primary); font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fa fa-calculator"></i> รายละเอียดราคาซ่อมทั่วไป
+                </h4>
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">ค่าอะไหล่ต้นทุน (บาท)</label>
+                    <input type="number" step="0.01" name="part_cost" id="edit_part_cost" class="form-control" oninput="calculateEditProfit()">
+                </div>
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">ค่าอะไหล่ที่ขายได้ (บาท)</label>
+                    <input type="number" step="0.01" name="part_selling_price" id="edit_part_selling_price" class="form-control" oninput="calculateEditProfit()">
+                </div>
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">ค่าแรงช่าง (บาท)</label>
+                    <input type="number" step="0.01" name="labor_fee" id="edit_labor_fee" class="form-control" oninput="calculateEditProfit()">
+                </div>
+                <div id="edit_profit_preview" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; padding: 0.75rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.9rem; margin-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(6,95,70,0.05);">
+                    <span>💵 คำนวณรายรับ (กำไรสุทธิ):</span>
+                    <span id="edit_profit_text" style="font-size: 1.1rem; color: #047857;">฿0.00</span>
+                </div>
+            </div>
+            
             <div class="form-group">
                 <label>วันที่ซ่อม</label>
                 <input type="date" name="repair_date" id="edit_repair_date" class="form-control" required>
@@ -137,17 +207,101 @@
 <form id="deleteRepairForm" method="POST" style="display: none;"></form>
 
 <script>
-    function showAddRepairModal() { document.getElementById('addRepairModal').style.display = 'flex'; }
+    function showAddRepairModal() { 
+        document.getElementById('addRepairModal').style.display = 'flex'; 
+        toggleAddFields();
+        calculateAddProfit();
+    }
+    
     function hideAddRepairModal() { document.getElementById('addRepairModal').style.display = 'none'; }
+
+    function toggleAddFields() {
+        const type = document.getElementById('add_repair_type').value;
+        const costGroup = document.getElementById('add_cost_group');
+        const generalGroup = document.getElementById('add_general_group');
+        const costInput = document.getElementById('add_cost');
+        
+        const partCost = document.getElementById('add_part_cost');
+        const partSelling = document.getElementById('add_part_selling_price');
+        const laborFee = document.getElementById('add_labor_fee');
+
+        if (type === 'general') {
+            costGroup.style.display = 'none';
+            generalGroup.style.display = 'block';
+            costInput.required = false;
+            partCost.required = true;
+            partSelling.required = true;
+            laborFee.required = true;
+        } else {
+            costGroup.style.display = 'block';
+            generalGroup.style.display = 'none';
+            costInput.required = true;
+            partCost.required = false;
+            partSelling.required = false;
+            laborFee.required = false;
+        }
+    }
+
+    function calculateAddProfit() {
+        const cost = parseFloat(document.getElementById('add_part_cost').value) || 0;
+        const sell = parseFloat(document.getElementById('add_part_selling_price').value) || 0;
+        const labor = parseFloat(document.getElementById('add_labor_fee').value) || 0;
+        const profit = (sell - cost) + labor;
+        document.getElementById('add_profit_text').innerText = '฿' + profit.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
 
     function showEditRepairModal(repair) {
         document.getElementById('editRepairForm').action = `/admin/repairs/edit/${repair.id}`;
         document.getElementById('edit_car_id').value = repair.car_id;
         document.getElementById('edit_repair_type').value = repair.repair_type;
         document.getElementById('edit_description').value = repair.description;
-        document.getElementById('edit_cost').value = repair.cost;
+        
+        document.getElementById('edit_part_cost').value = repair.part_cost || 0;
+        document.getElementById('edit_part_selling_price').value = repair.part_selling_price || 0;
+        document.getElementById('edit_labor_fee').value = repair.labor_fee || 0;
+        document.getElementById('edit_cost').value = repair.cost || 0;
+        
         document.getElementById('edit_repair_date').value = repair.repair_date;
+        
+        toggleEditFields();
+        calculateEditProfit();
+        
         document.getElementById('editRepairModal').style.display = 'flex';
+    }
+
+    function toggleEditFields() {
+        const type = document.getElementById('edit_repair_type').value;
+        const costGroup = document.getElementById('edit_cost_group');
+        const generalGroup = document.getElementById('edit_general_group');
+        const costInput = document.getElementById('edit_cost');
+        
+        const partCost = document.getElementById('edit_part_cost');
+        const partSelling = document.getElementById('edit_part_selling_price');
+        const laborFee = document.getElementById('edit_labor_fee');
+
+        if (type === 'general') {
+            costGroup.style.display = 'none';
+            generalGroup.style.display = 'block';
+            costInput.required = false;
+            partCost.required = true;
+            partSelling.required = true;
+            laborFee.required = true;
+        } else {
+            costGroup.style.display = 'block';
+            generalGroup.style.display = 'none';
+            costInput.required = true;
+            partCost.required = false;
+            partSelling.required = false;
+            laborFee.required = false;
+        }
+    }
+
+    function calculateEditProfit() {
+        const cost = parseFloat(document.getElementById('edit_part_cost').value) || 0;
+        const sell = parseFloat(document.getElementById('edit_part_selling_price').value) || 0;
+        const labor = parseFloat(document.getElementById('edit_labor_fee').value) || 0;
+        const profit = (sell - cost) + labor;
+        document.getElementById('edit_profit_text').innerText = '฿' + profit.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
 
     function hideEditRepairModal() {

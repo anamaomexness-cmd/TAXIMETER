@@ -30,7 +30,7 @@
                             {{ 'Super Admin' if staff.role == 'super_admin' else 'Admin' }}
                         </span>
                     </td>
-                    <td>{{ staff.created_at[:10] }}</td>
+                    <td>{{ staff.created_at | bangkok_time('%Y-%m-%d') }}</td>
                     <td>
                         {% if staff.role != 'super_admin' %}
                         <button class="btn" style="padding: 0.5rem; background: #fff5f5; color: var(--danger);"><i class="fa fa-trash"></i></button>

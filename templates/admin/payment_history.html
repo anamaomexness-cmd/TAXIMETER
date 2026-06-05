@@ -47,7 +47,7 @@
             <tbody>
                 {% for p in payments %}
                 <tr class="payment-row" data-car="{{ p.contracts.cars.license_plate }}" data-driver="{{ p.contracts.drivers.first_name }} {{ p.contracts.drivers.last_name }}">
-                    <td>{{ p.payment_date[:16].replace('T', ' ') }}</td>
+                    <td>{{ p.payment_date | bangkok_time('%Y-%m-%d %H:%M') }}</td>
                     <td><code>{{ p.receipt_no }}</code></td>
                     <td><strong>{{ p.contracts.cars.license_plate }}</strong></td>
                     <td>{{ p.contracts.drivers.first_name }} {{ p.contracts.drivers.last_name }}</td>

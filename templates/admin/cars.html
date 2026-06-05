@@ -47,8 +47,8 @@
                     <td style="font-weight: 700;">{{ car.license_plate }}</td>
                     <td>{{ car.brand }} {{ car.model }}</td>
                     <td>
-                        <span style="font-size: 0.85rem; padding: 2px 8px; border-radius: 5px; background: {% if car.car_type == 'taxi' %}#fef3c7; color: #92400e;{% else %}#e2e8f0; color: #475569;{% endif %}">
-                            {{ 'แท็กซี่' if car.car_type == 'taxi' else 'รถทั่วไป' }}
+                        <span style="font-size: 0.85rem; padding: 2px 8px; border-radius: 5px; background: {% if car.car_type == 'taxi' %}#fef3c7; color: #92400e;{% elif car.car_type == 'personal' %}#e0f2fe; color: #0369a1;{% else %}#e2e8f0; color: #475569;{% endif %}">
+                            {% if car.car_type == 'taxi' %}แท็กซี่{% elif car.car_type == 'personal' %}รถใช้เอง{% else %}รถทั่วไป{% endif %}
                         </span>
                     </td>
                     <td>
@@ -57,7 +57,7 @@
                             {% if car.status == 'available' %}ว่าง{% elif car.status == 'rented' %}เช่าอยู่{% else %}ซ่อมบำรุง{% endif %}
                         </span>
                     </td>
-                    <td>{{ car.created_at[:10] }}</td>
+                    <td>{{ car.created_at | bangkok_time('%Y-%m-%d') }}</td>
                     <td>
                         <button class="btn" style="padding: 0.5rem; background: #edf2f7; color: var(--text);" onclick='showEditCarModal({{ car|tojson|safe }})'><i class="fa fa-edit"></i></button>
                         <button class="btn" style="padding: 0.5rem; background: #fff5f5; color: var(--danger);" onclick="confirmDeleteCar('{{ car.id }}', '{{ car.license_plate }}')"><i class="fa fa-trash"></i></button>
@@ -95,6 +95,7 @@
                 <select name="car_type" class="form-control">
                     <option value="taxi">รถแท็กซี่</option>
                     <option value="general">รถทั่วไป</option>
+                    <option value="personal">รถใช้เอง</option>
                 </select>
             </div>
             <div class="form-group">
@@ -132,6 +133,7 @@
                 <select name="car_type" id="edit_car_type" class="form-control">
                     <option value="taxi">รถแท็กซี่</option>
                     <option value="general">รถทั่วไป</option>
+                    <option value="personal">รถใช้เอง</option>
                 </select>
             </div>
             <div class="form-group">

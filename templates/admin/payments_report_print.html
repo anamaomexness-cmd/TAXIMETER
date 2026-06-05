@@ -217,7 +217,7 @@
                     -
                     {% endif %}
                 </td>
-                <td class="text-center">{{ payment.payment_date[:10] }}</td>
+                <td class="text-center">{{ payment.payment_date | bangkok_time('%Y-%m-%d') }}</td>
                 <td>
                     {% if payment.payment_type == 'rent' %}ค่าเช่ารถ
                     {% elif payment.payment_type == 'deposit' %}เงินค้ำประกัน

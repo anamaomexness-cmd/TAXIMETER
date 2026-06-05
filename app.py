@@ -1,11 +1,45 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 from supabase_config import supabase, supabase_admin
 import os, json, uuid
 from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "taxi_meter_secret_key_123")
+
+# --- Timezone Helpers ---
+TZ_BANGKOK = timezone(timedelta(hours=7))
+
+def get_bangkok_now():
+    return datetime.now(TZ_BANGKOK)
+
+def get_bangkok_today():
+    return datetime.now(TZ_BANGKOK).date()
+
+def convert_to_bangkok(date_str_or_obj):
+    if not date_str_or_obj:
+        return ""
+    if isinstance(date_str_or_obj, datetime):
+        if date_str_or_obj.tzinfo is None:
+            date_str_or_obj = date_str_or_obj.replace(tzinfo=timezone.utc)
+        return date_str_or_obj.astimezone(TZ_BANGKOK)
+    try:
+        clean_str = date_str_or_obj.replace('Z', '+00:00')
+        dt = datetime.fromisoformat(clean_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(TZ_BANGKOK)
+    except Exception as e:
+        return date_str_or_obj
+
+@app.template_filter('bangkok_time')
+def bangkok_time_filter(date_str_or_obj, format_str='%Y-%m-%d %H:%M:%S'):
+    if not date_str_or_obj:
+        return ""
+    dt = convert_to_bangkok(date_str_or_obj)
+    if isinstance(dt, datetime):
+        return dt.strftime(format_str)
+    return str(dt)
 
 # --- Middleware ---
 def login_required(f):
@@ -133,14 +167,25 @@ def logout():
 def admin_dashboard():
     # Fetch summary stats
     client = supabase_admin if supabase_admin else supabase
-    cars_count = client.table('cars').select('id', count='exact').execute().count
-    drivers_count = client.table('drivers').select('id', count='exact').execute().count
-    active_contracts = client.table('contracts').select('id', count='exact').eq('status', 'active').execute().count
     
-    # Calculate Today's Income
-    today_str = date.today().isoformat()
-    payments_today = client.table('payments').select('amount').gte('payment_date', f"{today_str}T00:00:00").lte('payment_date', f"{today_str}T23:59:59").execute().data
-    today_income = sum(float(p['amount']) for p in payments_today)
+    # ดึงจำนวนรถเฉพาะประเภทแท็กซี่ (กรองรถใช้เองและรถทั่วไปออก)
+    cars_res = client.table('cars').select('car_type').execute().data
+    cars_count = len([c for c in cars_res if c.get('car_type') == 'taxi' or c.get('car_type') is None])
+    
+    drivers_count = client.table('drivers').select('id', count='exact').execute().count
+    
+    # ดึงเฉพาะสัญญาเช่าของรถแท็กซี่ที่เปิดอยู่
+    active_contracts_res = client.table('contracts').select('id, cars(car_type)').eq('status', 'active').execute().data
+    active_contracts = len([c for c in active_contracts_res if c.get('cars') and (c['cars'].get('car_type') == 'taxi' or c['cars'].get('car_type') is None)])
+    
+    # Calculate Today's Income (กรองเฉพาะรถแท็กซี่)
+    today_str = get_bangkok_today().isoformat()
+    payments_today = client.table('payments').select('amount, contracts(cars(car_type))').gte('payment_date', f"{today_str}T00:00:00+07:00").lte('payment_date', f"{today_str}T23:59:59+07:00").execute().data
+    today_income = sum(
+        float(p['amount']) for p in payments_today 
+        if p.get('contracts') and p['contracts'].get('cars') and 
+           (p['contracts']['cars'].get('car_type') == 'taxi' or p['contracts']['cars'].get('car_type') is None)
+    )
     
     # Fetch ledger transactions to calculate cash and bank balances
     try:
@@ -180,7 +225,7 @@ def admin_dashboard():
                            today_income=today_income,
                            cash_balance=cash_balance,
                            bank_balance=bank_balance,
-                           now=datetime.now().strftime('%d %B %Y'))
+                           now=get_bangkok_now().strftime('%d %B %Y'))
 
 @app.route('/admin/cars', methods=['GET', 'POST'])
 @admin_required
@@ -201,7 +246,7 @@ def manage_cars():
                 if file.filename:
                     # ใช้ Timestamp และสุ่มชื่อไฟล์เพื่อหลีกเลี่ยงอักขระภาษาไทยที่อาจมีปัญหา
                     ext = file.filename.split('.')[-1]
-                    safe_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
+                    safe_filename = f"{get_bangkok_now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
                     file_path = f"cars/{safe_filename}"
                     
                     # อัปโหลดไปยัง Supabase Storage โดยใช้สิทธิ์ Admin
@@ -257,7 +302,7 @@ def edit_car(car_id):
         for file in uploaded_files:
             if file.filename:
                 ext = file.filename.split('.')[-1]
-                safe_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
+                safe_filename = f"{get_bangkok_now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
                 file_path = f"cars/{safe_filename}"
                 
                 client.storage.from_('car_images').upload(
@@ -318,7 +363,7 @@ def manage_drivers():
             photo_file = request.files.get('photo_file')
             if photo_file and photo_file.filename:
                 ext = photo_file.filename.split('.')[-1]
-                path = f"drivers/profiles/{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
+                path = f"drivers/profiles/{get_bangkok_now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
                 client.storage.from_('driver_images').upload(path=path, file=photo_file.read(), file_options={"content-type": photo_file.content_type})
                 photo_url = client.storage.from_('driver_images').get_public_url(path)
 
@@ -326,7 +371,7 @@ def manage_drivers():
             license_file = request.files.get('license_photo_file')
             if license_file and license_file.filename:
                 ext = license_file.filename.split('.')[-1]
-                path = f"drivers/licenses/{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
+                path = f"drivers/licenses/{get_bangkok_now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
                 client.storage.from_('driver_images').upload(path=path, file=license_file.read(), file_options={"content-type": license_file.content_type})
                 license_photo_url = client.storage.from_('driver_images').get_public_url(path)
 
@@ -379,14 +424,14 @@ def edit_driver(driver_id):
         photo_file = request.files.get('photo_file')
         if photo_file and photo_file.filename:
             ext = photo_file.filename.split('.')[-1]
-            path = f"drivers/profiles/{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
+            path = f"drivers/profiles/{get_bangkok_now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
             client.storage.from_('driver_images').upload(path=path, file=photo_file.read(), file_options={"content-type": photo_file.content_type})
             update_data["photo_url"] = client.storage.from_('driver_images').get_public_url(path)
 
         license_file = request.files.get('license_photo_file')
         if license_file and license_file.filename:
             ext = license_file.filename.split('.')[-1]
-            path = f"drivers/licenses/{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
+            path = f"drivers/licenses/{get_bangkok_now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}.{ext}"
             client.storage.from_('driver_images').upload(path=path, file=license_file.read(), file_options={"content-type": license_file.content_type})
             update_data["license_photo_url"] = client.storage.from_('driver_images').get_public_url(path)
 
@@ -448,7 +493,7 @@ def manage_contracts():
                            contracts=contracts, 
                            available_cars=available_cars,
                            all_drivers=all_drivers,
-                           today_str=date.today().isoformat())
+                           today_str=get_bangkok_today().isoformat())
 
 @app.route('/admin/leaves', methods=['POST'])
 @admin_required
@@ -481,7 +526,7 @@ def manage_payments():
         amount = float(request.form.get('amount', 0))
         p_type = request.form.get('payment_type')
         notes = request.form.get('notes')
-        receipt_no = f"REC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        receipt_no = f"REC-{get_bangkok_now().strftime('%Y%m%d%H%M%S')}"
         
         try:
             res_insert = client.table('payments').insert({
@@ -489,7 +534,8 @@ def manage_payments():
                 "amount": amount,
                 "payment_type": p_type,
                 "notes": notes,
-                "receipt_no": receipt_no
+                "receipt_no": receipt_no,
+                "payment_date": get_bangkok_now().isoformat()
             }).execute()
             
             payment_id = res_insert.data[0]['id']
@@ -527,7 +573,7 @@ def manage_payments():
     payments = client.table('payments').select('*, contracts(*, drivers(first_name, last_name), cars(license_plate))').order('payment_date', desc=True).execute().data
     active_contracts = client.table('contracts').select('*, drivers(first_name, last_name), cars(license_plate)').eq('status', 'active').execute().data
     
-    return render_template('admin/payments.html', payments=payments, active_contracts=active_contracts, today_str=date.today().isoformat())
+    return render_template('admin/payments.html', payments=payments, active_contracts=active_contracts, today_str=get_bangkok_today().isoformat())
 
 @app.route('/admin/payments/print')
 @admin_required
@@ -538,7 +584,7 @@ def print_payments_report():
     search = request.args.get('search', '').strip().lower()
 
     try:
-        payments = client.table('payments').select('*, contracts(*, drivers(first_name, last_name), cars(license_plate))').order('payment_date', desc=False).execute().data
+        payments = client.table('payments').select('*, contracts(*, drivers(first_name, last_name), cars(license_plate, car_type))').order('payment_date', desc=False).execute().data
     except Exception as e:
         print(f"Error fetching payments for print: {e}")
         payments = []
@@ -547,7 +593,11 @@ def print_payments_report():
     total_amount = 0.0
 
     for p in payments:
-        p_date = p['payment_date'][:10]
+        # กรองรถใช้เองออกจากการคำนวณและแสดงผลในรายงาน
+        if p.get('contracts') and p['contracts'].get('cars') and p['contracts']['cars'].get('car_type') == 'personal':
+            continue
+
+        p_date = convert_to_bangkok(p['payment_date']).strftime('%Y-%m-%d')
         
         if start_date and p_date < start_date:
             continue
@@ -590,7 +640,7 @@ def print_payments_report():
                            search_query=search,
                            total_amount=total_amount,
                            config=config,
-                           today=datetime.now())
+                           today=get_bangkok_now())
 
 @app.route('/admin/repairs', methods=['GET', 'POST'])
 @admin_required
@@ -600,8 +650,20 @@ def manage_repairs():
         car_id = request.form.get('car_id')
         r_type = request.form.get('repair_type')
         desc = request.form.get('description')
-        cost = float(request.form.get('cost', 0))
         r_date = request.form.get('repair_date')
+        
+        part_cost = 0.0
+        part_selling_price = 0.0
+        labor_fee = 0.0
+        cost = 0.0
+        
+        if r_type == 'general':
+            part_cost = float(request.form.get('part_cost', 0))
+            part_selling_price = float(request.form.get('part_selling_price', 0))
+            labor_fee = float(request.form.get('labor_fee', 0))
+            cost = part_cost  # บันทึกต้นทุนจริงของอู่ในช่อง cost
+        else:
+            cost = float(request.form.get('cost', 0))
         
         try:
             res_insert = client.table('repairs').insert({
@@ -609,7 +671,10 @@ def manage_repairs():
                 "repair_type": r_type,
                 "description": desc,
                 "cost": cost,
-                "repair_date": r_date
+                "repair_date": r_date,
+                "part_cost": part_cost,
+                "part_selling_price": part_selling_price,
+                "labor_fee": labor_fee
             }).execute()
             
             repair_id = res_insert.data[0]['id']
@@ -618,7 +683,8 @@ def manage_repairs():
             car_details = client.table('cars').select('license_plate, car_type').eq('id', car_id).single().execute().data
             plate = car_details['license_plate']
             
-            # Auto-sync to Ledger (only if car_type is 'taxi')
+            # Auto-sync to Ledger
+            # 1. ถ้าเป็นรถแท็กซี่ -> บันทึกเป็นรายจ่าย (Expense) เสมอ
             if car_details['car_type'] == 'taxi':
                 client.table('ledger_transactions').insert({
                     "category": "expense",
@@ -627,15 +693,25 @@ def manage_repairs():
                     "description": f"ค่าใช้จ่ายออโต้ (ค่าซ่อมบำรุง): ทะเบียน {plate} - {desc}",
                     "reference_repair_id": repair_id
                 }).execute()
+            # 2. ถ้าเป็นรถซ่อมทั่วไป (General Repair) -> บันทึกกำไร (ส่วนต่างค่าอะไหล่ + ค่าแรง) เป็นรายรับ (Income)
+            elif r_type == 'general':
+                profit = (part_selling_price - part_cost) + labor_fee
+                client.table('ledger_transactions').insert({
+                    "category": "income",
+                    "payment_method": "cash",
+                    "amount": profit,
+                    "description": f"รายรับออโต้ (กำไรซ่อมรถทั่วไป): ทะเบียน {plate} - {desc}",
+                    "reference_repair_id": repair_id
+                }).execute()
             
             flash("บันทึกรายการซ่อมเรียบร้อยแล้ว", "success")
         except Exception as e:
             flash(f"เกิดข้อผิดพลาด: {str(e)}", "danger")
         return redirect(url_for('manage_repairs'))
 
-    repairs = client.table('repairs').select('*, cars(license_plate)').order('repair_date', desc=True).execute().data
+    repairs = client.table('repairs').select('*, cars(license_plate, car_type)').order('repair_date', desc=True).execute().data
     all_cars = client.table('cars').select('*').execute().data
-    return render_template('admin/repairs.html', repairs=repairs, all_cars=all_cars, today_str=date.today().isoformat())
+    return render_template('admin/repairs.html', repairs=repairs, all_cars=all_cars, today_str=get_bangkok_today().isoformat())
 
 @app.route('/admin/repairs/edit/<repair_id>', methods=['POST'])
 @admin_required
@@ -643,8 +719,20 @@ def edit_repair(repair_id):
     car_id = request.form.get('car_id')
     r_type = request.form.get('repair_type')
     desc = request.form.get('description')
-    cost = float(request.form.get('cost', 0))
     r_date = request.form.get('repair_date')
+    
+    part_cost = 0.0
+    part_selling_price = 0.0
+    labor_fee = 0.0
+    cost = 0.0
+    
+    if r_type == 'general':
+        part_cost = float(request.form.get('part_cost', 0))
+        part_selling_price = float(request.form.get('part_selling_price', 0))
+        labor_fee = float(request.form.get('labor_fee', 0))
+        cost = part_cost
+    else:
+        cost = float(request.form.get('cost', 0))
     
     try:
         client = supabase_admin if supabase_admin else supabase
@@ -653,7 +741,10 @@ def edit_repair(repair_id):
             "repair_type": r_type,
             "description": desc,
             "cost": cost,
-            "repair_date": r_date
+            "repair_date": r_date,
+            "part_cost": part_cost,
+            "part_selling_price": part_selling_price,
+            "labor_fee": labor_fee
         }).eq('id', repair_id).execute()
         
         # Fetch car details and car type
@@ -663,13 +754,23 @@ def edit_repair(repair_id):
         # Always delete the old transaction first to prevent mismatch
         client.table('ledger_transactions').delete().eq('reference_repair_id', repair_id).execute()
         
-        # Re-insert into ledger only if the car is a 'taxi'
+        # Re-insert into ledger
         if car_details['car_type'] == 'taxi':
             client.table('ledger_transactions').insert({
                 "category": "expense",
                 "payment_method": "cash",
                 "amount": cost,
                 "description": f"ค่าใช้จ่ายออโต้ (ค่าซ่อมบำรุง): ทะเบียน {plate} - {desc}",
+                "transaction_date": r_date,
+                "reference_repair_id": repair_id
+            }).execute()
+        elif r_type == 'general':
+            profit = (part_selling_price - part_cost) + labor_fee
+            client.table('ledger_transactions').insert({
+                "category": "income",
+                "payment_method": "cash",
+                "amount": profit,
+                "description": f"รายรับออโต้ (กำไรซ่อมรถทั่วไป): ทะเบียน {plate} - {desc}",
                 "transaction_date": r_date,
                 "reference_repair_id": repair_id
             }).execute()
@@ -703,7 +804,7 @@ def get_contract_debt(contract_id):
             return jsonify({"error": "Contract not found"}), 404
             
         start_date = datetime.strptime(contract['start_date'], '%Y-%m-%d').date()
-        today = date.today()
+        today = get_bangkok_today()
         
         # Calculate Leave Days
         leave_days = get_leave_days(contract_id, start_date, today)
@@ -752,7 +853,7 @@ def close_contract(contract_id):
             return redirect(url_for('manage_contracts'))
             
         start_date = datetime.strptime(contract['start_date'], '%Y-%m-%d').date()
-        today = date.today()
+        today = get_bangkok_today()
         
         # 1. Leaves
         leave_days = get_leave_days(contract_id, start_date, today)
@@ -895,8 +996,8 @@ def manage_reports():
     
     # Get filters
     report_type = request.args.get('type', 'all') # all, daily, monthly
-    selected_date = request.args.get('date', date.today().isoformat())
-    selected_month = request.args.get('month', date.today().strftime('%Y-%m'))
+    selected_date = request.args.get('date', get_bangkok_today().isoformat())
+    selected_month = request.args.get('month', get_bangkok_today().strftime('%Y-%m'))
     
     try:
         # Fetch all payments and repairs (filtering later for simplicity with car types)
@@ -907,7 +1008,7 @@ def manage_reports():
         # Apply Date Filters
         if report_type == 'daily':
             # payment_date is TIMESTAMPTZ, repair_date is DATE
-            payments_raw = payments_query.gte('payment_date', f"{selected_date}T00:00:00").lte('payment_date', f"{selected_date}T23:59:59").execute().data
+            payments_raw = payments_query.gte('payment_date', f"{selected_date}T00:00:00+07:00").lte('payment_date', f"{selected_date}T23:59:59+07:00").execute().data
             repairs_raw = repairs_query.eq('repair_date', selected_date).execute().data
         elif report_type == 'monthly':
             # Calculate start and end of month
@@ -917,7 +1018,7 @@ def manage_reports():
             start_date = f"{selected_month}-01"
             end_date = f"{selected_month}-{last_day}"
             
-            payments_raw = payments_query.gte('payment_date', f"{start_date}T00:00:00").lte('payment_date', f"{end_date}T23:59:59").execute().data
+            payments_raw = payments_query.gte('payment_date', f"{start_date}T00:00:00+07:00").lte('payment_date', f"{end_date}T23:59:59+07:00").execute().data
             repairs_raw = repairs_query.gte('repair_date', start_date).lte('repair_date', end_date).execute().data
         else:
             payments_raw = payments_query.execute().data
@@ -964,15 +1065,15 @@ def manage_reports():
 def print_report():
     client = supabase_admin if supabase_admin else supabase
     report_type = request.args.get('type', 'daily')
-    selected_date = request.args.get('date', date.today().isoformat())
-    selected_month = request.args.get('month', date.today().strftime('%Y-%m'))
+    selected_date = request.args.get('date', get_bangkok_today().isoformat())
+    selected_month = request.args.get('month', get_bangkok_today().strftime('%Y-%m'))
     
     try:
         payments_query = client.table('payments').select('*, contracts(car_id, cars(car_type, license_plate), drivers(first_name, last_name))')
         repairs_query = client.table('repairs').select('*, cars(car_type, license_plate)')
         
         if report_type == 'daily':
-            payments_raw = payments_query.gte('payment_date', f"{selected_date}T00:00:00").lte('payment_date', f"{selected_date}T23:59:59").execute().data
+            payments_raw = payments_query.gte('payment_date', f"{selected_date}T00:00:00+07:00").lte('payment_date', f"{selected_date}T23:59:59+07:00").execute().data
             repairs_raw = repairs_query.eq('repair_date', selected_date).execute().data
             title = f"รายงานประจำวันที่ {selected_date}"
         else:
@@ -981,7 +1082,7 @@ def print_report():
             last_day = calendar.monthrange(year, month)[1]
             start_date = f"{selected_month}-01"
             end_date = f"{selected_month}-{last_day}"
-            payments_raw = payments_query.gte('payment_date', f"{start_date}T00:00:00").lte('payment_date', f"{end_date}T23:59:59").execute().data
+            payments_raw = payments_query.gte('payment_date', f"{start_date}T00:00:00+07:00").lte('payment_date', f"{end_date}T23:59:59+07:00").execute().data
             repairs_raw = repairs_query.gte('repair_date', start_date).lte('repair_date', end_date).execute().data
             title = f"รายงานประจำเดือน {selected_month}"
 
@@ -1008,7 +1109,7 @@ def print_report():
                                repairs=repairs, 
                                title=title,
                                config=config,
-                               today=datetime.now())
+                               today=get_bangkok_now())
     except Exception as e:
         flash(f"เกิดข้อผิดพลาด: {str(e)}", "danger")
         return redirect(url_for('manage_reports'))
@@ -1116,7 +1217,7 @@ def print_history():
                                contracts=contracts, 
                                title=title, 
                                config=config,
-                               today=datetime.now())
+                               today=get_bangkok_now())
     except Exception as e:
         flash(f"เกิดข้อผิดพลาด: {str(e)}", "danger")
         return redirect(url_for('manage_history'))
@@ -1135,6 +1236,9 @@ def manage_payment_history():
         payments = []
         for p in payments_raw:
             if not p.get('contracts'): continue
+            # กรองรถใช้เองออก
+            if p['contracts'].get('cars') and p['contracts']['cars'].get('car_type') == 'personal':
+                continue
             
             match_car = True
             match_driver = True
@@ -1170,6 +1274,9 @@ def print_payment_history():
         payments = []
         for p in payments_raw:
             if not p.get('contracts'): continue
+            # กรองรถใช้เองออก
+            if p['contracts'].get('cars') and p['contracts']['cars'].get('car_type') == 'personal':
+                continue
             if search_car and search_car.lower() not in p['contracts']['cars']['license_plate'].lower(): continue
             if search_driver:
                 full_name = f"{p['contracts']['drivers']['first_name']} {p['contracts']['drivers']['last_name']}".lower()
@@ -1188,7 +1295,7 @@ def print_payment_history():
                                payments=payments, 
                                title=title, 
                                config=config,
-                               today=datetime.now())
+                               today=get_bangkok_now())
     except Exception as e:
         flash(f"เกิดข้อผิดพลาด: {str(e)}", "danger")
         return redirect(url_for('manage_payment_history'))
@@ -1206,7 +1313,7 @@ def manage_ledger():
             method = request.form.get('payment_method')  # 'cash' or 'bank'
             amount = float(request.form.get('amount', 0))
             desc = request.form.get('description')
-            t_date = request.form.get('transaction_date', date.today().isoformat())
+            t_date = request.form.get('transaction_date', get_bangkok_today().isoformat())
             try:
                 client.table('ledger_transactions').insert({
                     "category": category,
@@ -1221,7 +1328,7 @@ def manage_ledger():
         elif action == 'transfer':
             transfer_type = request.form.get('transfer_type')  # 'deposit' or 'withdrawal'
             amount = float(request.form.get('amount', 0))
-            t_date = request.form.get('transaction_date', date.today().isoformat())
+            t_date = request.form.get('transaction_date', get_bangkok_today().isoformat())
             desc = "นำฝากเงินสดเข้าบัญชีธนาคาร" if transfer_type == 'deposit' else "ถอนเงินสดจากธนาคารมาถือเงินสด"
             try:
                 client.table('ledger_transactions').insert({
@@ -1271,7 +1378,7 @@ def manage_ledger():
                            transactions=txs, 
                            cash_balance=cash_balance, 
                            bank_balance=bank_balance,
-                           today_str=date.today().isoformat())
+                           today_str=get_bangkok_today().isoformat())
 
 @app.route('/admin/ledger/delete/<tx_id>', methods=['POST'])
 @admin_required
@@ -1293,9 +1400,9 @@ def print_ledger_report():
     method_filter = request.args.get('method', 'all')  # 'all', 'cash', 'bank'
 
     if not start_date:
-        start_date = date.today().replace(day=1).isoformat()
+        start_date = get_bangkok_today().replace(day=1).isoformat()
     if not end_date:
-        end_date = date.today().isoformat()
+        end_date = get_bangkok_today().isoformat()
 
     try:
         txs = client.table('ledger_transactions').select('*').order('transaction_date', desc=False).order('created_at', desc=False).execute().data
@@ -1451,7 +1558,7 @@ def print_ledger_report():
                            total_income=total_income,
                            total_expense=total_expense,
                            config=config,
-                           today=datetime.now())
+                           today=get_bangkok_now())
 
 # --- Driver Routes ---
 
@@ -1476,7 +1583,7 @@ def driver_dashboard():
     if contract:
         # 1. Calculate Total Rent Due based on Promotion and Leaves
         start_date = datetime.strptime(contract['start_date'], '%Y-%m-%d').date()
-        today = date.today()
+        today = get_bangkok_today()
         
         # Calculate Leave Days
         leave_days = get_leave_days(contract['id'], start_date, today)

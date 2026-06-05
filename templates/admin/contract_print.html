@@ -148,7 +148,7 @@
 
         <div class="contract-meta">
             ทำที่: ............................................................<br>
-            วันที่: {{ contract.created_at[:10] }}
+            วันที่: {{ contract.created_at | bangkok_time('%Y-%m-%d') }}
         </div>
 
         <div class="content-row">
